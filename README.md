@@ -8,7 +8,7 @@
   ▸ Combat Log    : Detection based on the spells cast and auras applied. <br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;* Includes optional automatic Combat Log fix. <br>
   ▸ BG Scoreboard : Detection based on the ratio between healing and damage done. <br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; (healing > h2d * damage &nbsp; & &nbsp; healing > hth).
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; (*healing > h2d * damage* &nbsp; & &nbsp; *healing > hth*).
 - Allows printing the list of detected healers to personal or public chat channels. 
 <p align="center">
   <img src="https://raw.githubusercontent.com/KhalGH/BattleGroundHealers-WotLK/refs/heads/assets/assets/BattleGroundHealersUI.jpg" 
