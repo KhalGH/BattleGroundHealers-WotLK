@@ -1,4 +1,4 @@
-# BattleGroundHealerss
+# BattleGroundHealers
 
 **BattleGroundHealers** is a World of Warcraft addon for **Wrath of the Lich King (WotLK) 3.3.5a**  
 
