@@ -11,7 +11,7 @@
 - Allows printing the list of detected healers to personal or public chat channels. 
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/KhalGH/BattleGroundHealers-WotLK/refs/heads/assets/assets/BGHicon100x100.png" 
+  <img src="https://raw.githubusercontent.com/KhalGH/BattleGroundHealers-WotLK/refs/heads/assets/assets/BGHicon200p.png" 
        alt="ItemLevel UI Preview" width="15%">
 </p>
 <p align="center">
