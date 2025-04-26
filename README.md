@@ -1,5 +1,4 @@
 # BattleGroundHealers
-
 **BattleGroundHealers** is a World of Warcraft addon for **Wrath of the Lich King (WotLK) 3.3.5a**  
 
 ## Features  
@@ -10,6 +9,11 @@
   ▸ BG Scoreboard : Detection based on the ratio between healing and damage done. <br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; (*healing > h2d * damage* &nbsp; & &nbsp; *healing > hth*).
 - Allows printing the list of detected healers to personal or public chat channels. 
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/KhalGH/BattleGroundHealers-WotLK/refs/heads/assets/assets/BGHicon100x100.png" 
+       alt="ItemLevel UI Preview" width="15%">
+</p>
 <p align="center">
   <img src="https://raw.githubusercontent.com/KhalGH/BattleGroundHealers-WotLK/refs/heads/assets/assets/BattleGroundHealersUI.jpg" 
        alt="ItemLevel UI Preview" width="93%">
