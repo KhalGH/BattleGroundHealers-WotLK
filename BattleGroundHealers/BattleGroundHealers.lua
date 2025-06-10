@@ -329,15 +329,15 @@ local function SetupNamePlate(plate)
             anchorMapping = {
                 ["left"] = {
                     anchorPoint = "RIGHT", relativePoint = "LEFT",
-                    xOffset = 17.5, yOffset = 16
+                    xOffset = 17.5, yOffset = 13
                 },
                 ["top"] = {
                     anchorPoint = "BOTTOM", relativePoint = "TOP",
-                    xOffset = 0, yOffset = 4
+                    xOffset = 0, yOffset = 1
                 },
                 ["right"] = {
                     anchorPoint = "LEFT", relativePoint = "RIGHT",
-                    xOffset = -16, yOffset = 16
+                    xOffset = -16, yOffset = 13
                 },
             }
             print("|cff00FF98[BGH]|r _VirtualPlates detected, anchors adjusted")
