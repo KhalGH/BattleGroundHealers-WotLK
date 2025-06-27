@@ -437,14 +437,14 @@ local function UpdateCurrentBGplayers()
     end
     for name in pairs(WSSFhealers) do
         if not currentBGplayers[name] then
-            BGH_print(string.format(L["%s (%s) has left the BG, removed from healers list."], name, WSSFhealers[name] == 1 and "|cff3060ffAlliance|r" or "|cffcc1a1aHorde|r"))
+            BGH_print(string.format(L["%s (%s) has left the BG, removed from healers list."], name, WSSFhealers[name] == 1 and L["|cff3060ffAlliance|r"] or L["|cffcc1a1aHorde|r"]))
             WSSFhealers[name] = nil
             SetBGHmark(name, nil)
         end
     end
     for name in pairs(CLEUhealers) do
         if not currentBGplayers[name] then
-            BGH_print(string.format(L["%s (%s) has left the BG, removed from healers list."], name, CLEUhealers[name] == 1 and "|cff3060ffAlliance|r" or "|cffcc1a1aHorde|r"))
+            BGH_print(string.format(L["%s (%s) has left the BG, removed from healers list."], name, CLEUhealers[name] == 1 and L["|cff3060ffAlliance|r"] or L["|cffcc1a1aHorde|r"]))
             CLEUhealers[name] = nil
             SetBGHmark(name, nil)  
         end
