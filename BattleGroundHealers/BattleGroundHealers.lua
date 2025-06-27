@@ -59,6 +59,7 @@ local next = next
 
 local BGHframe = CreateFrame("Frame")
 local CLEUframe = CreateFrame("Frame")
+local L = BattleGroundHealers_Localization
 local CLEUhealers = {}
 local WSSFhealers = {}
 local GlobalNamePlates = {}
@@ -185,6 +186,10 @@ local function InitSettings()
             BGHsettings[k] = nil
         end
     end
+end
+
+local function BGH_print(...)
+	print("|cff00FF98[BGH]|r", ...)
 end
 
 local function HandleLevelTextOverlap(BGHregion)
@@ -323,7 +328,7 @@ local function SetupNamePlate(plate)
                     xOffset = -3, yOffset = 0
                 },
             }
-            print("|cff00FF98[BGH]|r TidyPlates detected, anchors adjusted.")
+            BGH_print(L["TidyPlates detected, anchors adjusted."])
         end
     elseif plate.RealPlate then -- Using _VirtualPlates custom frames if available
         if not VirtualPlatesCheck then
@@ -343,7 +348,7 @@ local function SetupNamePlate(plate)
                     xOffset = -16, yOffset = 13
                 },
             }
-            print("|cff00FF98[BGH]|r _VirtualPlates detected, anchors adjusted.")
+            BGH_print(L["_VirtualPlates detected, anchors adjusted."])
         end
     end
     local BGHregion = CreateFrame("Frame", nil, plate)
@@ -425,21 +430,21 @@ local function UpdateCurrentBGplayers()
             if not playerFaction and name == playerName then
                 playerFaction = faction
                 if debugMode then
-                    print("|cff00FF98[BGH] Debug:|r Player Faction: ", playerFaction == 1 and "Alliance" or "Horde")
+                    BGH_print("Debug: Player Faction: ", playerFaction == 1 and "Alliance" or "Horde")
                 end
             end
         end
     end
     for name in pairs(WSSFhealers) do
         if not currentBGplayers[name] then
-            print(string.format("|cff00FF98[BGH]|r %s (%s) has left the BG, removed from healers list.", name, WSSFhealers[name] == 1 and "Alliance" or "Horde"))
+            BGH_print(string.format(L["%s (%s) has left the BG, removed from healers list."], name, WSSFhealers[name] == 1 and "|cff3060ffAlliance|r" or "|cffcc1a1aHorde|r"))
             WSSFhealers[name] = nil
             SetBGHmark(name, nil)
         end
     end
     for name in pairs(CLEUhealers) do
         if not currentBGplayers[name] then
-            print(string.format("|cff00FF98[BGH]|r %s (%s) has left the BG, removed from healers list.", name, CLEUhealers[name] == 1 and "Alliance" or "Horde"))
+            BGH_print(string.format(L["%s (%s) has left the BG, removed from healers list."], name, CLEUhealers[name] == 1 and "|cff3060ffAlliance|r" or "|cffcc1a1aHorde|r"))
             CLEUhealers[name] = nil
             SetBGHmark(name, nil)  
         end
@@ -459,14 +464,14 @@ local function UpdateWSSFhealers()
                         WSSFhealers[name] = faction
                         SetBGHmark(name, ((BGHsettings.iconInvertColor == 1) == (faction == playerFaction)) and IconTextures[BGHsettings.iconStyle].Red or IconTextures[BGHsettings.iconStyle].Blue)
                         if debugMode then
-                            print(string.format("|cff00FF98[BGH] Debug:|r %s (%s) added to BG Scoreboard healers list.", name, faction == 1 and "Alliance" or "Horde"))
+                            BGH_print(string.format("Debug: %s (%s) added to BG Scoreboard healers list.", name, faction == 1 and "Alliance" or "Horde"))
                         end 
                     end
                 elseif WSSFhealers[name] then
                     WSSFhealers[name] = nil
                     SetBGHmark(name, nil)
                     if debugMode then
-                        print(string.format("|cff00FF98[BGH] Debug:|r %s (%s) removed from BG Scoreboard healers list (below healing-to-damage ratio).", name, faction == 1 and "Alliance" or "Horde"))
+                        BGH_print(string.format("Debug: %s (%s) removed from BG Scoreboard healers list (below healing-to-damage ratio).", name, faction == 1 and "Alliance" or "Horde"))
                     end 
                 end
             end
@@ -489,7 +494,7 @@ local function UpdateCLEUstate()
                 CLEUframe:UnregisterEvent("UNIT_SPELLCAST_SUCCEEDED")
                 USSregistered = false
                 if debugMode then
-                    print("|cff00FF98[BGH] Debug:|r Automatic Combat Log fix disabled until Preparation phase is over.")
+                    BGH_print("Debug: Automatic Combat Log fix disabled until Preparation phase is over.")
                 end
             end
             if CLEUregistered then
@@ -497,7 +502,7 @@ local function UpdateCLEUstate()
                 CLEUregistered = false
                 ClearHealers(CLEUhealers)
                 if debugMode then
-                    print("|cff00FF98[BGH] Debug:|r Combat Log tracking disabled until Preparation phase is over.")
+                    BGH_print("Debug: Combat Log tracking disabled until Preparation phase is over.")
                 end
             end
         else
@@ -505,14 +510,14 @@ local function UpdateCLEUstate()
                 CLEUframe:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")    
                 CLEUregistered = true        
                 if debugMode then
-                    print("|cff00FF98[BGH] Debug:|r Combat Log tracking enabled.")
+                    BGH_print("Debug: Combat Log tracking enabled.")
                 end 
             end
             if not USSregistered and BGHsettings.CLEUfix == 1 then
                 CLEUframe:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
                 USSregistered = true
                 if debugMode then
-                    print("|cff00FF98[BGH] Debug:|r Automatic Combat Log fix enabled.")
+                    BGH_print("Debug: Automatic Combat Log fix enabled.")
                 end 
             end
         end
@@ -542,12 +547,12 @@ local function CLEUhandler(self, event, ...)
                                     pcall(BGH_Notifier.OnHealerDetected, sourceName, HCN[class])
                                 end
                                 if debugMode then
-                                    print(string.format("|cff00FF98[BGH] Debug:|r %s (%s) added to Combat Log healers list (spellID: %s)", name, faction == 1 and "Alliance" or "Horde", spellID))
+                                    BGH_print(string.format("Debug: %s (%s) added to Combat Log healers list (spellID: %s)", name, faction == 1 and "Alliance" or "Horde", spellID))
                                 end 
                                 if WSSFhealers[name] then
                                     WSSFhealers[name] = nil
                                     if debugMode then
-                                        print(string.format("|cff00FF98[BGH] Debug:|r %s (%s) removed from BG Scoreboard healers list (Combat Log list priority).", name, faction == 1 and "Alliance" or "Horde"))
+                                        BGH_print(string.format("Debug: %s (%s) removed from BG Scoreboard healers list (Combat Log list priority).", name, faction == 1 and "Alliance" or "Horde"))
                                     end
                                 end
                                 break
@@ -584,7 +589,7 @@ local function OnUpdate(self, elapsed)
 		if (lastCLEUevent and ( GetTime() - lastCLEUevent ) <= 1) then return end
 		CombatLogClearEntries()
         if debugMode then
-            print("|cff00FF98[BGH] Debug:|r Combat Log unresponsive. Entries cleared to fix it.")
+            BGH_print("Debug: Combat Log unresponsive. Entries cleared to fix it.")
         end   
 	end
 end
@@ -594,13 +599,13 @@ local printCooldown = 5
 ---------------- Prints the list of detected healers with a cooldown control ----------------
 local function PrintDetectedHealers()
     if not inBG then
-        print("|cff00FF98[BGH]|r Print failed (not in BG)")
+        BGH_print(L["Print failed (not in BG)"])
         return
     end
     local currentTime = GetTime()
     if currentTime - lastPrintTime < printCooldown then
         local timeRemaining = printCooldown - (currentTime - lastPrintTime)
-        print(string.format("|cff00FF98[BGH]|r Wait %.1f s to print again.", timeRemaining))
+        BGH_print(string.format(L["Wait %.1f s to print again."], timeRemaining))
         return
     end
     local allianceHealers = {}
@@ -624,12 +629,12 @@ local function PrintDetectedHealers()
         end
     end 
     local BGNameByID = {
-        [444] = "Warsong Gulch",
-        [462] = "Arathi Basin",
-        [402] = "Alterac Valley",
-        [483] = "Eye of the Storm",
-        [513] = "Strand of the Ancients",
-        [541] = "Isle of Conquest",
+        [444] = L["Warsong Gulch"],
+        [462] = L["Arathi Basin"],
+        [402] = L["Alterac Valley"],
+        [483] = L["Eye of the Storm"],
+        [513] = L["Strand of the Ancients"],
+        [541] = L["Isle of Conquest"],
     }
     SetMapToCurrentZone()
     local BGName = BGNameByID[GetCurrentMapAreaID()] or "current BG"
@@ -644,13 +649,13 @@ local function PrintDetectedHealers()
         printChannel = nil
     end
     if printChannel then
-        SendChatMessage(string.format("[BattleGroundHealers] Healers detected in %s:", BGName), printChannel)
-        SendChatMessage(string.format(" %d Alliance: %s", #allianceHealers, #allianceHealers > 0 and table.concat(allianceHealers, ", ") or ""), printChannel)
-        SendChatMessage(string.format(" %d Horde: %s", #hordeHealers, #hordeHealers > 0 and table.concat(hordeHealers, ", ") or ""), printChannel)
+        SendChatMessage(string.format("[BattleGroundHealers] " .. L["Healers detected in %s:"], BGName), printChannel)
+        SendChatMessage(string.format(L[" %d Alliance: %s"], #allianceHealers, #allianceHealers > 0 and table.concat(allianceHealers, ", ") or ""), printChannel)
+        SendChatMessage(string.format(L[" %d Horde: %s"], #hordeHealers, #hordeHealers > 0 and table.concat(hordeHealers, ", ") or ""), printChannel)
     else
-        print(string.format("|cff00FF98[BattleGroundHealers]|r Healers detected in %s:", BGName))
-        print(string.format(" %d Alliance: %s", #allianceHealers, #allianceHealers > 0 and table.concat(allianceHealers, ", ") or ""))
-        print(string.format(" %d Horde: %s", #hordeHealers, #hordeHealers > 0 and table.concat(hordeHealers, ", ") or ""))
+        print(string.format("|cff00FF98[BattleGroundHealers]|r " .. L["Healers detected in %s:"], BGName))
+        print(string.format(L[" %d |cff3060ffAlliance|r: %s"], #allianceHealers, #allianceHealers > 0 and table.concat(allianceHealers, ", ") or ""))
+        print(string.format(L[" %d |cffcc1a1aHorde|r: %s"], #hordeHealers, #hordeHealers > 0 and table.concat(hordeHealers, ", ") or ""))
     end
     lastPrintTime = currentTime
 end
@@ -738,7 +743,7 @@ local function ConfigUI()
         ConfigUIFrame.subtitle1 = ConfigUIFrame:CreateFontString(nil,"ARTWORK") 
         ConfigUIFrame.subtitle1:SetFont("Fonts\\FRIZQT__.TTF", 11)
         ConfigUIFrame.subtitle1:SetPoint("TOP", 0, -53)
-        ConfigUIFrame.subtitle1:SetText("Healer Detection Methods")
+        ConfigUIFrame.subtitle1:SetText(L["Healer Detection Methods"])
         ConfigUIFrame.subtitle1:SetTextColor(1, 0.82, 0, 1)
         CreateSeparatorLine(ConfigUIFrame.subtitle1)
 
@@ -747,18 +752,17 @@ local function ConfigUI()
         CLEUfixCheckbox:SetPoint("TOPLEFT", 59, -102)
         CLEUfixCheckbox:SetSize(21, 21)
         CLEUfixCheckbox.Text = _G[CLEUfixCheckbox:GetName() .. "Text"]
-        CLEUfixCheckbox.Text:SetText("Automatic Combat Log Fix")
+        CLEUfixCheckbox.Text:SetText(L["Automatic Combat Log Fix"])
         CLEUfixCheckbox.Text:SetPoint("LEFT", CLEUfixCheckbox, "RIGHT", 1, 1) 
         CLEUfixCheckbox.Text:SetFont(CLEUfixCheckbox.Text:GetFont(), 9.5)
         CLEUfixCheckbox.Text:SetTextColor(1, 1, 1, 1)
         CLEUfixCheckbox:SetChecked(BGHsettings.CLEUfix == 1)
         CLEUfixCheckbox:SetScript("OnClick", function(self)
             if self:GetChecked() then
-                print("|cff00FF98[BGH]|r Automatic Combat Log Fix enabled")
+                BGH_print(L["Automatic Combat Log Fix"] .. L["|cff88FF88 Enabled |r"])
                 BGHsettings.CLEUfix = 1
-                
             else
-                print("|cff00FF98[BGH]|r Automatic Combat Log Fix disabled")
+                BGH_print(L["Automatic Combat Log Fix"].. L["|cffff4444 Disabled |r"])
                 BGHsettings.CLEUfix = 0
                 CLEUframe:UnregisterEvent("UNIT_SPELLCAST_SUCCEEDED")
                 USSregistered = false
@@ -770,7 +774,7 @@ local function ConfigUI()
         CLEUtrackingCheckbox:SetPoint("TOPLEFT", 34, -77)
         CLEUtrackingCheckbox:SetSize(24, 24)
         CLEUtrackingCheckbox.Text = _G[CLEUtrackingCheckbox:GetName() .. "Text"]
-        CLEUtrackingCheckbox.Text:SetText("Track Healers via Combat Log")
+        CLEUtrackingCheckbox.Text:SetText(L["Track Healers via Combat Log"])
         CLEUtrackingCheckbox.Text:SetPoint("LEFT", CLEUtrackingCheckbox, "RIGHT", 1, 1) 
         CLEUtrackingCheckbox.Text:SetTextColor(1, 1, 1, 1)
         CLEUtrackingCheckbox:SetChecked(BGHsettings.CLEUtracking == 1)
@@ -783,7 +787,7 @@ local function ConfigUI()
         end
         CLEUtrackingCheckbox:SetScript("OnClick", function(self)
             if self:GetChecked() then
-                print("|cff00FF98[BGH]|r Combat Log tracking enabled")
+                BGH_print(L["Combat Log tracking"] .. L["|cff88FF88 Enabled |r"])
                 BGHsettings.CLEUtracking = 1
                 if inBG then
                     UpdateCurrentBGplayers()
@@ -792,7 +796,7 @@ local function ConfigUI()
                 CLEUfixCheckbox.Text:SetTextColor(1, 1, 1)
                 CLEUfixCheckbox:Enable()
             else
-                print("|cff00FF98[BGH]|r Combat Log tracking disabled")
+                BGH_print(L["Combat Log tracking"] .. L["|cffff4444 Disabled |r"])
                 BGHsettings.CLEUtracking = 0
                 CLEUframe:UnregisterEvent("UNIT_SPELLCAST_SUCCEEDED")
                 USSregistered = false
@@ -813,20 +817,20 @@ local function ConfigUI()
         WSSFtrackingCheckbox:SetPoint("TOPLEFT", 34, -127)
         WSSFtrackingCheckbox:SetSize(24, 24)
         WSSFtrackingCheckbox.Text = _G[WSSFtrackingCheckbox:GetName() .. "Text"]
-        WSSFtrackingCheckbox.Text:SetText("Track Healers via BG Scoreboard")
+        WSSFtrackingCheckbox.Text:SetText(L["Track Healers via BG Scoreboard"])
         WSSFtrackingCheckbox.Text:SetPoint("LEFT", WSSFtrackingCheckbox, "RIGHT", 1, 1) 
         WSSFtrackingCheckbox.Text:SetTextColor(1, 1, 1, 1)
         WSSFtrackingCheckbox:SetChecked(BGHsettings.WSSFtracking == 1)
         WSSFtrackingCheckbox:SetScript("OnClick", function(self)
             if self:GetChecked() then
-                print("|cff00FF98[BGH]|r BG Scoreboard tracking enabled")
+                BGH_print(L["BG Scoreboard tracking"] .. L["|cff88FF88 Enabled |r"])
                 BGHsettings.WSSFtracking = 1
                 if inBG then
                     UpdateCurrentBGplayers()
                     UpdateWSSFhealers()
                 end
             else
-                print("|cff00FF98[BGH]|r BG Scoreboard tracking disabled")
+                BGH_print(L["BG Scoreboard tracking"] .. L["|cffff4444 Disabled |r"])
                 BGHsettings.WSSFtracking = 0
                 ClearHealers(WSSFhealers)
             end
@@ -837,7 +841,7 @@ local function ConfigUI()
         printChannelDropdown:SetPoint("TOPRIGHT", -18, -161)
         printChannelDropdown.Label = ConfigUIFrame:CreateFontString(nil, "ARTWORK", "GameFontNormal")
         printChannelDropdown.Label:SetPoint("RIGHT", printChannelDropdown, "LEFT", 14, 3)
-        printChannelDropdown.Label:SetText("Channel:")
+        printChannelDropdown.Label:SetText(L["Channel:"])
         printChannelDropdown.Label:SetFont(GameFontNormal:GetFont(), 10.5)
         printChannelDropdown.Font = CreateFont("BGH_PrintChannelFont")
         printChannelDropdown.Font:SetFont(GameFontNormal:GetFont(), 9/UIParent:GetScale())
@@ -847,7 +851,7 @@ local function ConfigUI()
         printChannelDropdown.Text:ClearAllPoints()
         printChannelDropdown.Text:SetPoint("CENTER", printChannelDropdown, "CENTER", -5, 3)
         printChannelDropdown.Text:SetJustifyH("CENTER")
-        printChannelDropdown.Options = {"BG", "Party", "Guild", "Self"}
+        printChannelDropdown.Options = {"BG", "Party", "Guild", L["Self"]}
         UIDropDownMenu_SetWidth(printChannelDropdown, 60)
         UIDropDownMenu_SetText(printChannelDropdown, BGHsettings.printChannel or "BG")
         UIDropDownMenu_Initialize(printChannelDropdown, function(self, level)
@@ -866,10 +870,10 @@ local function ConfigUI()
       
         -- Print Healers (Button)
         local printHealersButton = CreateFrame("Button", "BGHConfigUIprintHealersButton", ConfigUIFrame, "UIPanelButtonTemplate")
-        printHealersButton:SetSize(86, 26)
+        printHealersButton:SetSize(91, 26)
         printHealersButton:GetFontString():SetFont(printHealersButton:GetFontString():GetFont(), 10.5)
         printHealersButton:SetPoint("TOPLEFT", 34, -161)
-        printHealersButton:SetText("Print Healers")
+        printHealersButton:SetText(L["Print Healers"])
         printHealersButton:SetScript("OnClick", function()
             PrintDetectedHealers()
         end)   
@@ -878,7 +882,7 @@ local function ConfigUI()
         ConfigUIFrame.subtitle2 = ConfigUIFrame:CreateFontString(nil,"ARTWORK") 
         ConfigUIFrame.subtitle2:SetFont("Fonts\\FRIZQT__.TTF", 11)
         ConfigUIFrame.subtitle2:SetPoint("TOP", 0, -204)
-        ConfigUIFrame.subtitle2:SetText("Icon Display Settings")
+        ConfigUIFrame.subtitle2:SetText(L["Icon Display Settings"])
         ConfigUIFrame.subtitle2:SetTextColor(1, 0.82, 0, 1)
         CreateSeparatorLine(ConfigUIFrame.subtitle2)
 
@@ -891,7 +895,7 @@ local function ConfigUI()
         iconSizeSlider:SetValue(BGHsettings.iconSize or 40)
         iconSizeSlider.Label = iconSizeSlider:CreateFontString(nil, "ARTWORK", "GameFontNormal")
         iconSizeSlider.Label:SetPoint("TOP", iconSizeSlider, "BOTTOM", 0, -1)
-        iconSizeSlider.Label:SetText("Icon Size")
+        iconSizeSlider.Label:SetText(L["Icon Size"])
         iconSizeSlider.Label:SetFont(GameFontNormal:GetFont(), 10.5)
         iconSizeSlider.Thumb = iconSizeSlider:GetThumbTexture()
         iconSizeSlider.Value = iconSizeSlider:CreateFontString(nil, "ARTWORK", "GameFontHighlight") 
@@ -911,7 +915,7 @@ local function ConfigUI()
         iconStyleDropdown:SetPoint("TOPLEFT", 18, -292)
         iconStyleDropdown.Label = ConfigUIFrame:CreateFontString(nil, "ARTWORK", "GameFontNormal")
         iconStyleDropdown.Label:SetPoint("BOTTOM", iconStyleDropdown, "TOP", 0, 2)
-        iconStyleDropdown.Label:SetText("Icon Style")
+        iconStyleDropdown.Label:SetText(L["Icon Style"])
         iconStyleDropdown.Label:SetFont(GameFontNormal:GetFont(), 10.5)
         iconStyleDropdown.Font = CreateFont("BGH_iconStyleFont")
         iconStyleDropdown.Font:SetFont(GameFontNormal:GetFont(), 9/UIParent:GetScale())
@@ -953,7 +957,7 @@ local function ConfigUI()
         iconXoffsetSlider:SetValue(BGHsettings.iconXoffset or 0)
         iconXoffsetSlider.Label = iconXoffsetSlider:CreateFontString(nil, "ARTWORK", "GameFontNormal")
         iconXoffsetSlider.Label:SetPoint("TOP", iconXoffsetSlider, "BOTTOM", 0, -1)
-        iconXoffsetSlider.Label:SetText("X offset")
+        iconXoffsetSlider.Label:SetText(L["X offset"])
         iconXoffsetSlider.Label:SetFont(GameFontNormal:GetFont(), 10.5)
         iconXoffsetSlider.Thumb = iconXoffsetSlider:GetThumbTexture()
         iconXoffsetSlider.Value = iconXoffsetSlider:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
@@ -977,7 +981,7 @@ local function ConfigUI()
         iconYoffsetSlider:SetValue(BGHsettings.iconYoffset or 0)
         iconYoffsetSlider.Label = iconYoffsetSlider:CreateFontString(nil, "ARTWORK", "GameFontNormal")
         iconYoffsetSlider.Label:SetPoint("TOP", iconYoffsetSlider, "BOTTOM", 0, -1)
-        iconYoffsetSlider.Label:SetText("Y offset")
+        iconYoffsetSlider.Label:SetText(L["Y offset"])
         iconYoffsetSlider.Label:SetFont(GameFontNormal:GetFont(), 10.5)
         iconYoffsetSlider.Thumb = iconYoffsetSlider:GetThumbTexture()
         iconYoffsetSlider.Value = iconYoffsetSlider:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
@@ -997,7 +1001,7 @@ local function ConfigUI()
         iconAnchorDropdown:SetPoint("TOPRIGHT", -18, -292)
         iconAnchorDropdown.Label = ConfigUIFrame:CreateFontString(nil, "ARTWORK", "GameFontNormal")
         iconAnchorDropdown.Label:SetPoint("BOTTOM", iconAnchorDropdown, "TOP", 0, 2)
-        iconAnchorDropdown.Label:SetText("Anchor")
+        iconAnchorDropdown.Label:SetText(L["Anchor"])
         iconAnchorDropdown.Label:SetFont(GameFontNormal:GetFont(), 10.5)
         iconAnchorDropdown.Font = CreateFont("BGH_AnchorFont")
         iconAnchorDropdown.Font:SetFont(GameFontNormal:GetFont(), 9/UIParent:GetScale())
@@ -1036,7 +1040,7 @@ local function ConfigUI()
         iconInvertColorCheckbox:SetPoint("TOPLEFT", 34, -432)
         iconInvertColorCheckbox:SetSize(24, 24)
         iconInvertColorCheckbox.Text = _G[iconInvertColorCheckbox:GetName().."Text"]
-        iconInvertColorCheckbox.Text:SetText("Invert Icon Color")
+        iconInvertColorCheckbox.Text:SetText(L["Invert Icon Color"])
         iconInvertColorCheckbox.Text:SetPoint("LEFT", iconInvertColorCheckbox, "RIGHT", 1, 1) 
         iconInvertColorCheckbox.Text:SetTextColor(1, 1, 1, 1)
         iconInvertColorCheckbox:SetChecked(BGHsettings.iconInvertColor == 1)
@@ -1051,10 +1055,10 @@ local function ConfigUI()
         -- Mark Target (Button)
         local testMarkButton = CreateFrame("Button", "BGHConfigUItestMarkButton", ConfigUIFrame, "UIPanelButtonTemplate")
         local testModeMarkedNames = {}
-        testMarkButton:SetSize(90, 26)
+        testMarkButton:SetSize(95, 26)
         testMarkButton:GetFontString():SetFont(testMarkButton:GetFontString():GetFont(), 10.5)
         testMarkButton:SetPoint("TOPRIGHT", -34, -460)
-        testMarkButton:SetText("Mark Target")
+        testMarkButton:SetText(L["Mark Target"])
         testMarkButton:Disable()
         testMarkButton:SetScript("OnClick", function()
             local name = UnitName("target")
@@ -1081,16 +1085,16 @@ local function ConfigUI()
         testModeCheckbox:SetPoint("TOPLEFT", 34, -462)
         testModeCheckbox:SetSize(24, 24)
         testModeCheckbox.Text = _G[testModeCheckbox:GetName().."Text"]
-        testModeCheckbox.Text:SetText("Enable Test Mode")
+        testModeCheckbox.Text:SetText(L["Enable Test Mode"])
         testModeCheckbox.Text:SetPoint("LEFT", testModeCheckbox, "RIGHT", 1, 1) 
         testModeCheckbox.Text:SetTextColor(1, 1, 1, 1)
         testModeCheckbox:SetChecked(false)
         testModeCheckbox:SetScript("OnClick", function(self)
             if self:GetChecked() then
-                print("|cff00FF98[BGH]|r Test mode enabled")
+                BGH_print(L["Test mode"] .. L["|cff88FF88 Enabled |r"])
                 testMarkButton:Enable()
             else
-                print("|cff00FF98[BGH]|r Test mode disabled")
+                BGH_print(L["Test mode"] .. L["|cffff4444 Disabled |r"])
                 testMarkButton:Disable()
                 for _, name in ipairs(testModeMarkedNames) do
                     SetBGHmark(name, nil)
@@ -1106,14 +1110,14 @@ local function ConfigUI()
         resetButton:GetFontString():SetPoint("CENTER", resetButton, "CENTER", 0, 0.5)
         resetButton:GetFontString():SetFont(resetButton:GetFontString():GetFont(), 11.5)
         resetButton:SetPoint("BOTTOM", ConfigUIFrame, "BOTTOM", 0, 20)
-        resetButton:SetText("Reset")
+        resetButton:SetText(L["Reset"])
         resetButton:SetScript("OnClick", function()
             StaticPopupDialogs["CONFIRM_RESET_BGH_CONFIG"] = {
-                text = "Are you sure you want to reset all settings to default?",
-                button1 = "Yes",
-                button2 = "No",
+                text = L["Are you sure you want to reset all settings to default?"],
+                button1 = L["Yes"],
+                button2 = L["No"],
                 OnAccept = function()
-                    print("|cff00FF98[BGH]|r Settings reset to default values.")
+                    BGH_print(L["Settings reset to default values."])
                     if BGHsettings.iconInvertColor ~= DefaultSettings.iconInvertColor then
                         for name, texture in pairs(MarkedNames) do
                             MarkedNames[name] = invertTextureColor(texture)
@@ -1227,7 +1231,7 @@ local function ConfigUI()
                 end
                 testModeMarkedNames = {}
                 UpdateAllMarks()
-                print("|cff00FF98[BGH]|r Test mode disabled")
+                BGH_print(L["Test mode"] .. L["|cffff4444 Disabled |r"])
             end
         end)
     end
@@ -1260,7 +1264,7 @@ local function AddInterfaceOptions()
         description:SetJustifyV("TOP")
         description:SetShadowColor(0, 0, 0)
         description:SetShadowOffset(1, -1)
-        description:SetFormattedText("Marks BG healer nameplates with a configurable icon.\nSupports two detection methods that can work simultaneously.\n\nAuthor: |cffc41f3bKhal|r\nVersion: %.1f", version)
+        description:SetFormattedText(L["Marks BG healer nameplates with a configurable icon.\nSupports two detection methods that can work simultaneously.\n\nAuthor: |cffc41f3bKhal|r\nVersion: %.1f"], version)
         description:SetNonSpaceWrap(true)
         local settingsButton = CreateFrame("Button", nil, self, "UIPanelButtonTemplate")
         settingsButton:SetSize(100, 30)
@@ -1285,7 +1289,7 @@ BGHframe:SetScript("OnEvent", function(self, event, ...)
     if event == "ADDON_LOADED" and (...) == addonName then
         AddInterfaceOptions()
         InitSettings()
-        print(string.format("|cff00FF98[BGH]|r BattleGroundHealers v%.1f by |cffc41f3bKhal|r", version))
+        BGH_print(string.format("BattleGroundHealers v%.1f by |cffc41f3bKhal|r", version))
     elseif event == "PLAYER_ENTERING_WORLD" then
         local _, instance = IsInInstance()
         if instance == "pvp" then
@@ -1324,39 +1328,39 @@ SlashCmdList["BGH"] = function(msg)
         PrintDetectedHealers()
     elseif (cmd == "h2d") then
         if (not args or args == "") then
-            print("|cff00FF98[BGH]|r Current BG Scoreboard healing-to-damage tracking ratio: " .. BGHsettings.h2dRatio);
+            BGH_print(L["Current BG Scoreboard healing-to-damage tracking ratio:"], BGHsettings.h2dRatio);
         else
             local value = tonumber(args);
             if (value ~= nil) then
                 if (value > 5) then value = 5 end
                 if (value < 1) then value = 1 end
                 BGHsettings.h2dRatio = value;
-                print("|cff00FF98[BGH]|r BG Scoreboard healing-to-damage tracking ratio set to: " .. BGHsettings.h2dRatio);       
+                BGH_print(L["BG Scoreboard healing-to-damage tracking ratio set to:"], BGHsettings.h2dRatio);       
             else
-                print("|cff00FF98[BGH]|r Value is not a number");
+                BGH_print(L["Value is not a number"]);
             end
         end
     elseif (cmd == "hth") then
         if (not args or args == "") then
-            print("|cff00FF98[BGH]|r Current BG Scoreboard healing tracking threshold: " .. BGHsettings.healingThreshold);
+            BGH_print(L["Current BG Scoreboard healing tracking threshold:"], BGHsettings.healingThreshold);
         else
             local value = tonumber(args);
             if (value ~= nil) then
                 if (value > 100000) then value = 100000 end
                 if (value < 10000) then value = 10000 end
                 BGHsettings.healingThreshold = value;
-                print("|cff00FF98[BGH]|r BG Scoreboard healing tracking threshold set to: " .. BGHsettings.healingThreshold);       
+                BGH_print(L["BG Scoreboard healing tracking threshold set to:"], BGHsettings.healingThreshold);       
             else
-                print("|cff00FF98[BGH]|r Value is not a number");
+                BGH_print(L["Value is not a number"]);
             end
         end
     elseif cmd == "debug" then
         if debugMode then 
             debugMode = false
-            print("|cff00FF98[BGH]|r Debug mode disabled")
+            BGH_print("Debug mode |cffff4444Disabled|r")
         else 
             debugMode = true
-            print("|cff00FF98[BGH]|r Debug mode enabled")
+            BGH_print("Debug mode |cff88FF88Enabled|r")
         end
     end
 end
