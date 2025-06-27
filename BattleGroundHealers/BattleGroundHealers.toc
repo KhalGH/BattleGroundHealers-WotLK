@@ -5,4 +5,5 @@
 ## Author: |cffc41f3bKhal|r
 ## SavedVariables: BGHsettings
 
+Locales.xml
 BattleGroundHealers.lua
