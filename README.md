@@ -10,9 +10,9 @@
 - Marks BG healer nameplates with a configurable icon.  
 - Supports two detection methods that can work simultaneously: <br>
   ▸ Combat Log    : Detection based on the spells cast and auras applied. <br>
-&nbsp; &nbsp; &nbsp; &nbsp;  &nbsp; * Includes optional automatic Combat Log fix. (recommend disabling if using another CLog fix addon) <br>
+&nbsp; &nbsp; &nbsp; &nbsp;  * Includes optional automatic Combat Log fix. (recommend disabling if using another CLog fix addon) <br>
   ▸ BG Scoreboard : Detection based on the ratio between healing and damage done. <br>
-&nbsp; &nbsp; &nbsp; &nbsp;  &nbsp; * A unit is considered a healer if: (*healing > h2d * damage* &nbsp; & &nbsp; *healing > hth*).
+&nbsp; &nbsp; &nbsp; &nbsp;  * A unit is considered a healer if: (*healing > h2d * damage* &nbsp; & &nbsp; *healing > hth*).
 - Allows printing the list of detected healers to personal or public chat channels.
 - Implemented callback to provide healer detection data to [BattlegroundTargets](https://github.com/KhalGH/BattlegroundTargets-WotLK).
 
