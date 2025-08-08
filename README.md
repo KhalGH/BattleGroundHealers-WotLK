@@ -15,6 +15,7 @@
 &nbsp; &nbsp; &nbsp; &nbsp;  * A unit is considered a healer if: (*healing > h2d * damage* &nbsp; & &nbsp; *healing > hth*).
 - Allows printing the list of detected healers to personal or public chat channels.
 - Implemented callback to provide healer detection data to [BattlegroundTargets](https://github.com/KhalGH/BattlegroundTargets-WotLK).
+- Exposes a global variable with the healer count per faction for [BattleGroundBalance](https://github.com/KhalGH/BattlegroundBalance-WotLK).
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/KhalGH/BattleGroundHealers-WotLK/refs/heads/assets/assets/BattleGroundHealersUI.jpg" 
@@ -28,11 +29,11 @@
 - **`/bgh hth <#>`** → Modifies healing threshold for BG Scoreboard detection    
 
 ## Installation  
-1. [Download](https://github.com/KhalGH/BattleGroundHealers-WotLK/releases/download/v1.3/BattleGroundHealers-v1.3.zip) the addon
+1. [Download](https://github.com/KhalGH/BattleGroundHealers-WotLK/releases/download/v1.4/BattleGroundHealers-v1.4.zip) the addon
 2. Extract the **BattleGroundHealers** folder into `World of Warcraft/Interface/AddOns/`.  
 3. Restart the game and enable the addon.  
 
 ## Information  
-- **Addon Version:** 1.3  
+- **Addon Version:** 1.4  
 - **Game Version:** 3.3.5a (WotLK)  
 - **Author:** Khal  
