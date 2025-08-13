@@ -39,6 +39,7 @@ local DefaultSettings = {
     iconXoffset = 0,            -- Horizontal offset relative to the icon anchor (-40 to 40)
     iconYoffset = 0,            -- Vertical offset relative to the icon anchor (-40 to 40)
     iconInvertColor = 0,        -- Invert icon colors, by default enemies are red and allies are blue (1 = enabled, 0 = disabled)
+    showMessages = 1,           -- Addon chat messages (1 = enabled, 0 = disabled)
 }
 
 local setmetatable, print, next, ipairs, pairs, rawget, select, pcall, string_format, string_lower, string_find, table_insert, table_remove, math_sqrt, math_abs, math_floor, math_min, math_max, tonumber =
@@ -75,7 +76,7 @@ local debugMode = false
 BGH.AllianceCount = 0
 BGH.HordeCount = 0
 BGH_Notifier = BGH_Notifier or {}
-BGH_Notifier.OnHealerDetected = ni
+BGH_Notifier.OnHealerDetected = nil
 
 local IconTextures = {
     Blizzlike = {
@@ -327,7 +328,9 @@ local function SetupNamePlate(plate)
                     xOffset = -3, yOffset = 0
                 },
             }
-            BGHprint(L["TidyPlates detected, anchors adjusted."])
+            if BGHsettings.showMessages == 1 then 
+                BGHprint(L["TidyPlates detected, anchors adjusted."]) 
+            end
         end
     elseif plate.RealPlate then -- Using _VirtualPlates custom frames if available
         if not VirtualPlatesCheck then
@@ -347,7 +350,9 @@ local function SetupNamePlate(plate)
                     xOffset = -16, yOffset = 13
                 },
             }
-            BGHprint(L["_VirtualPlates detected, anchors adjusted."])
+            if BGHsettings.showMessages == 1 then 
+                BGHprint(L["_VirtualPlates detected, anchors adjusted."]) 
+            end
         end
     end
     local BGHregion = CreateFrame("Frame", nil, plate)
@@ -438,25 +443,27 @@ local function UpdateCurrentBGplayers()
             end
         end
     end
-    local function CleanLeftHealers(healersList)
+    local function ClearDeserterHealers(healersList)
         for name, data in pairs(healersList) do
             if not currentBGplayers[name] then
-                if data then
-                    local class = data.class
-                    local color = class and RAID_CLASS_COLORS[class]
-                    local coloredName = color and RGBToHex(color.r, color.g, color.b) .. name .. "|r" or name
-                    local factionText = data.faction == 1 and HEX_COLOR_ALLIANCE .. "(" .. L["Alliance"] .. ")|r" or HEX_COLOR_HORDE .. "(" .. L["Horde"] .. ")|r"
-                    BGHprint(string_format(L["%s %s has left the BG, removed from healers list."], coloredName, factionText))
-                else
-                    BGHprint(string_format(L["%s has left the BG, removed from healers list."], name))
+                if BGHsettings.showMessages == 1 or debugMode then
+                    if data then
+                        local class = data.class
+                        local color = class and RAID_CLASS_COLORS[class]
+                        local coloredName = color and RGBToHex(color.r, color.g, color.b) .. name .. "|r" or name
+                        local factionText = data.faction == 1 and HEX_COLOR_ALLIANCE .. "(" .. L["Alliance"] .. ")|r" or HEX_COLOR_HORDE .. "(" .. L["Horde"] .. ")|r"
+                        BGHprint(string_format(L["%s %s has left the BG, removed from healers list."], coloredName, factionText))
+                    else
+                        BGHprint(string_format(L["%s has left the BG, removed from healers list."], name))
+                    end
                 end
                 healersList[name] = nil
                 SetBGHmark(name, nil)
             end
         end
     end
-    CleanLeftHealers(WSSFhealers)
-    CleanLeftHealers(CLEUhealers)
+    ClearDeserterHealers(WSSFhealers)
+    ClearDeserterHealers(CLEUhealers)
 end
 
 ---------- Updates the list of healers based on the BG Scoreboard (WorldStateScoreFrame), prioritizing the Combat Log healers list if active ----------
@@ -793,10 +800,8 @@ local function ConfigUI()
         CLEUfixCheckbox:SetChecked(BGHsettings.CLEUfix == 1)
         CLEUfixCheckbox:SetScript("OnClick", function(self)
             if self:GetChecked() then
-                BGHprint(L["Automatic Combat Log Fix"], HEX_GREEN .. L["Enabled"] .. "|r")
                 BGHsettings.CLEUfix = 1
             else
-                BGHprint(L["Automatic Combat Log Fix"], HEX_RED .. L["Disabled"] .. "|r")
                 BGHsettings.CLEUfix = 0
                 CLEUframe:UnregisterEvent("UNIT_SPELLCAST_SUCCEEDED")
                 USSregistered = false
@@ -821,7 +826,6 @@ local function ConfigUI()
         end
         CLEUtrackingCheckbox:SetScript("OnClick", function(self)
             if self:GetChecked() then
-                BGHprint(L["Combat Log tracking"], HEX_GREEN .. L["Enabled"] .. "|r")
                 BGHsettings.CLEUtracking = 1
                 if inBG then
                     UpdateCurrentBGplayers()
@@ -830,7 +834,6 @@ local function ConfigUI()
                 CLEUfixCheckbox.Text:SetTextColor(1, 1, 1)
                 CLEUfixCheckbox:Enable()
             else
-                BGHprint(L["Combat Log tracking"], HEX_RED .. L["Disabled"] .. "|r")
                 BGHsettings.CLEUtracking = 0
                 CLEUframe:UnregisterEvent("UNIT_SPELLCAST_SUCCEEDED")
                 USSregistered = false
@@ -857,14 +860,12 @@ local function ConfigUI()
         WSSFtrackingCheckbox:SetChecked(BGHsettings.WSSFtracking == 1)
         WSSFtrackingCheckbox:SetScript("OnClick", function(self)
             if self:GetChecked() then
-                BGHprint(L["BG Scoreboard tracking"], HEX_GREEN .. L["Enabled"] .. "|r")
                 BGHsettings.WSSFtracking = 1
                 if inBG then
                     UpdateCurrentBGplayers()
                     UpdateWSSFhealers()
                 end
             else
-                BGHprint(L["BG Scoreboard tracking"], HEX_RED .. L["Disabled"] .. "|r")
                 BGHsettings.WSSFtracking = 0
                 ClearHealers(WSSFhealers)
             end
@@ -1125,10 +1126,8 @@ local function ConfigUI()
         testModeCheckbox:SetChecked(false)
         testModeCheckbox:SetScript("OnClick", function(self)
             if self:GetChecked() then
-                BGHprint(L["Test mode"], HEX_GREEN .. L["Enabled"] .. "|r")
                 testMarkButton:Enable()
             else
-                BGHprint(L["Test mode"], HEX_RED .. L["Disabled"] .. "|r")
                 testMarkButton:Disable()
                 for _, name in ipairs(testModeMarkedNames) do
                     SetBGHmark(name, nil)
@@ -1265,7 +1264,6 @@ local function ConfigUI()
                 end
                 testModeMarkedNames = {}
                 UpdateAllMarks()
-                BGHprint(L["Test mode"], HEX_RED .. L["Disabled"] .. "|r")
             end
         end)
     end
@@ -1323,7 +1321,7 @@ BGH:SetScript("OnEvent", function(self, event, ...)
     if event == "ADDON_LOADED" and (...) == addonName then
         AddInterfaceOptions()
         InitSettings()
-        BGHprint(string_format("BattleGroundHealers v%.1f by |cffc41f3bKhal|r", version))
+        print(string_format(" |cff00FF98BattleGroundHealers|r v%.1f by |cffc41f3bKhal|r", version))
     elseif event == "PLAYER_ENTERING_WORLD" then
         local _, instance = IsInInstance()
         if instance == "pvp" then
@@ -1362,6 +1360,9 @@ SlashCmdList["BGH"] = function(msg)
         ConfigUI()
     elseif cmd == "print" then
         PrintDetectedHealers()
+    elseif cmd == "msg" then
+            BGHsettings.showMessages = BGHsettings.showMessages == 1 and 0 or 1
+            BGHprint("Chat messages " .. (BGHsettings.showMessages == 1 and (HEX_GREEN .. "Enabled" .. "|r") or (HEX_RED .. "Disabled" .. "|r")))
     elseif (cmd == "h2d") then
         if (not args or args == "") then
             BGHprint(L["Current BG Scoreboard healing-to-damage tracking ratio:"], BGHsettings.h2dRatio);
