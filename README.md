@@ -25,8 +25,9 @@
 ## Chat Commands  
 - **`/bgh`** &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; → Opens the configuration panel.  
 - **`/bgh print`** &nbsp; &nbsp; → Prints the list of detected healers to the selected channel.
-- **`/bgh h2d <#>`** → Modifies healing-to-damage ratio threshold for BG Scoreboard detection
-- **`/bgh hth <#>`** → Modifies healing threshold for BG Scoreboard detection    
+- **`/bgh msg`** &nbsp; &nbsp; &nbsp;&nbsp; → Toggles addon chat messages on/off.
+- **`/bgh h2d <#>`** → Modifies healing-to-damage ratio threshold for BG Scoreboard detection.
+- **`/bgh hth <#>`** → Modifies healing threshold for BG Scoreboard detection.    
 
 ## Installation  
 1. [Download](https://github.com/KhalGH/BattleGroundHealers-WotLK/releases/download/v1.4/BattleGroundHealers-v1.4.zip) the addon
