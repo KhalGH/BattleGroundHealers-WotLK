@@ -44,12 +44,12 @@ local DefaultSettings = {
 
 local setmetatable, print, next, ipairs, pairs, rawget, select, pcall, string_format, string_lower, string_find, table_insert, table_remove, math_sqrt, math_abs, math_floor, math_min, math_max, tonumber =
       setmetatable, print, next, ipairs, pairs, rawget, select, pcall, string.format, string.lower, string.find, table.insert, table.remove, math.sqrt, math.abs, math.floor, math.min, math.max, tonumber
-local CreateFrame, GetSpellInfo, RequestBattlefieldScoreData, GetNumBattlefieldScores, GetBattlefieldScore, IsInInstance, CombatLogClearEntries, SetMapToCurrentZone, GetCurrentMapAreaID, SendChatMessage, UnitName, UnitAura, UnitCanAttack, GetTime, wipe =
-      CreateFrame, GetSpellInfo, RequestBattlefieldScoreData, GetNumBattlefieldScores, GetBattlefieldScore, IsInInstance, CombatLogClearEntries, SetMapToCurrentZone, GetCurrentMapAreaID, SendChatMessage, UnitName, UnitAura, UnitCanAttack, GetTime, wipe
+local CreateFrame, GetSpellInfo, SetBattlefieldScoreFaction, RequestBattlefieldScoreData, GetNumBattlefieldScores, GetBattlefieldScore, IsInInstance, CombatLogClearEntries, SetMapToCurrentZone, GetCurrentMapAreaID, SendChatMessage, UnitName, UnitAura, UnitCanAttack, GetTime, wipe =
+      CreateFrame, GetSpellInfo, SetBattlefieldScoreFaction, RequestBattlefieldScoreData, GetNumBattlefieldScores, GetBattlefieldScore, IsInInstance, CombatLogClearEntries, SetMapToCurrentZone, GetCurrentMapAreaID, SendChatMessage, UnitName, UnitAura, UnitCanAttack, GetTime, wipe
 local UIDropDownMenu_SetWidth, UIDropDownMenu_SetText, UIDropDownMenu_Initialize, UIDropDownMenu_CreateInfo, UIDropDownMenu_AddButton, StaticPopup_Show, InterfaceOptions_AddCategory =
       UIDropDownMenu_SetWidth, UIDropDownMenu_SetText, UIDropDownMenu_Initialize, UIDropDownMenu_CreateInfo, UIDropDownMenu_AddButton, StaticPopup_Show, InterfaceOptions_AddCategory
-local WorldFrame, LOCALIZED_CLASS_NAMES_MALE, LOCALIZED_CLASS_NAMES_FEMALE, RAID_CLASS_COLORS =
-      WorldFrame, LOCALIZED_CLASS_NAMES_MALE, LOCALIZED_CLASS_NAMES_FEMALE, RAID_CLASS_COLORS
+local LOCALIZED_CLASS_NAMES_MALE, LOCALIZED_CLASS_NAMES_FEMALE, RAID_CLASS_COLORS, WorldFrame, WorldStateScoreFrame =
+      LOCALIZED_CLASS_NAMES_MALE, LOCALIZED_CLASS_NAMES_FEMALE, RAID_CLASS_COLORS, WorldFrame, WorldStateScoreFrame
 
 local BGH = CreateFrame("Frame", "BattleGroundHealers")
 local CLEUframe = CreateFrame("Frame")
@@ -539,18 +539,21 @@ local function UpdateCLEUstate()
     end
 end
 
-local lastCLEUevent
-local CLEUtimeout
+local lastCLEUtime = nil
+local CLEUtimeout = nil
 local CLEUcheck = false
 ------------------- Updates the list of healers based on Combat Log Events -------------------
 local function CLEUhandler(self, event, ...)
     if event == "COMBAT_LOG_EVENT_UNFILTERED" then
-        lastCLEUevent = GetTime()
+        lastCLEUtime = GetTime()
         local _, subEvent, _, sourceName, _, _, _, _, spellID = ...
         if subEvent == "SPELL_CAST_SUCCESS" or subEvent == "SPELL_AURA_APPLIED" then
             if healerSpellHash[spellID] then
                 local shortName = sourceName:match("([^%-]+).*")
                 if not CLEUhealers[shortName] then
+                    if WorldStateScoreFrame:IsShown() and WorldStateScoreFrame.selectedTab and WorldStateScoreFrame.selectedTab > 1 then return end
+                    SetBattlefieldScoreFaction()
+                    RequestBattlefieldScoreData()
                     for i = 1, GetNumBattlefieldScores() do
                         local name, _, _, _, _, faction, _, _, class = GetBattlefieldScore(i)
                         if name then
@@ -607,22 +610,26 @@ local function UpdateHealersCount()
 end
 
 local lastUpdateTime = 0
-local UpdateInterval = 5
+local UPDATE_INTERVAL = 5
 ---------- Periodically updates healer lists and fix the Combat Log if it's unresponsive ----------
 local function OnUpdate(self, elapsed)
     lastUpdateTime = lastUpdateTime + elapsed
-    if lastUpdateTime >= UpdateInterval then
-        UpdateCurrentBGplayers()
-        UpdateWSSFhealers()
+    if lastUpdateTime >= UPDATE_INTERVAL then
+        if not (WorldStateScoreFrame:IsShown() and WorldStateScoreFrame.selectedTab and WorldStateScoreFrame.selectedTab > 1) then
+            SetBattlefieldScoreFaction()
+            RequestBattlefieldScoreData()
+            UpdateCurrentBGplayers()
+            UpdateWSSFhealers()
+            UpdateHealersCount()
+        end
         UpdateCLEUstate()
-        UpdateHealersCount()
         lastUpdateTime = 0
     end
 	if CLEUcheck then
 		CLEUtimeout = CLEUtimeout - elapsed
 		if (CLEUtimeout > 0) then return end
 		CLEUcheck = false
-		if (lastCLEUevent and ( GetTime() - lastCLEUevent ) <= 1) then return end
+		if (lastCLEUtime and ( GetTime() - lastCLEUtime ) <= 1) then return end
 		CombatLogClearEntries()
         if debugMode then
             BGHprint("Debug: Combat Log unresponsive. Entries cleared to fix it.")
@@ -1323,8 +1330,8 @@ BGH:SetScript("OnEvent", function(self, event, ...)
         InitSettings()
         print(string_format(" |cff00FF98BattleGroundHealers|r v%.1f by |cffc41f3bKhal|r", version))
     elseif event == "PLAYER_ENTERING_WORLD" then
-        local _, instance = IsInInstance()
-        if instance == "pvp" then
+        local _, instanceType = IsInInstance()
+        if instanceType == "pvp" then
             RequestBattlefieldScoreData()
             UpdateCurrentBGplayers()
             UpdateWSSFhealers()
@@ -1343,6 +1350,9 @@ BGH:SetScript("OnEvent", function(self, event, ...)
             playerFaction = false  
             currentBGplayers = {} 
             lastUpdateTime = 0
+            lastCLEUtime = nil
+            CLEUtimeout = nil
+            CLEUcheck = false
             ClearHealers(CLEUhealers)
             ClearHealers(WSSFhealers)
             self.AllianceCount = 0
