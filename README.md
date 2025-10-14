@@ -16,7 +16,7 @@
 - Allows printing the list of detected healers to personal or public chat channels.
 - Implemented callback to provide healer detection data to [BattlegroundTargets](https://github.com/KhalGH/BattlegroundTargets-WotLK).
 - Exposes a global variable with the healer count per faction for [BattleGroundBalance](https://github.com/KhalGH/BattleGroundBalance-WotLK).
-- Compatible with TidyPlates, ElvUI, KuiNameplates, Aloft, and KhalPlates
+- Compatible with native nameplates, TidyPlates, ElvUI, KuiNameplates, Aloft amd KhalPlates.
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/KhalGH/BattleGroundHealers-WotLK/refs/heads/assets/assets/BattleGroundHealersUI.jpg" 
