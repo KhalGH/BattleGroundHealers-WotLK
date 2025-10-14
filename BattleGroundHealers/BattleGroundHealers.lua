@@ -69,8 +69,12 @@ local CLEUregistered = false
 local USSregistered = false
 local playerFaction = false
 local BlizzPlates = true
+local KhalPlatesCheck = false
 local TidyPlatesCheck = false
-local VirtualPlatesCheck = false
+local ElvUICheck = false
+local ElvUIdynamicAnchor = true -- Forces the icon to follow ElvUI's HealthBar (it moves or hides with it). Set to false for a static "always show" state.
+local KuiNameplatesCheck = false
+local AloftCheck = false
 local debugMode = false
 
 BGH.AllianceCount = 0
@@ -192,8 +196,9 @@ local function BGHprint(...)
 	print("|cff00FF98[BGH]|r", ...)
 end
 
-local function HandleLevelTextOverlap(BGHregion)
-    local texture = MarkedNames[BGHregion.activeName]
+local function HandleLevelTextOverlap(BGHframe)
+    local texture = MarkedNames[BGHframe.activeName]
+    local levelRegion = BGHframe.levelRegion
     if texture then
         if BGHsettings.iconAnchor == "right" then
             local x = BGHsettings.iconXoffset
@@ -204,9 +209,9 @@ local function HandleLevelTextOverlap(BGHregion)
                 local R = math_sqrt(((x + r - 12)/0.8)^2 + (y/0.5)^2)
                 local d = math_abs(1 - 1/R)*math_sqrt((x + r - 12)^2+(y)^2)
                 if d < r or R < 1 then
-                    BGHregion.levelRegion:Hide()
+                    levelRegion:Hide()
                 else
-                    BGHregion.levelRegion:Show()
+                    levelRegion:Show()
                 end
             elseif BGHsettings.iconStyle == "Minimalist" then
                 local inOverlapDomain = (
@@ -222,120 +227,102 @@ local function HandleLevelTextOverlap(BGHregion)
                     D <= 69 - 5 * x
                 )
                 if inOverlapDomain and OverlapAdjustment then
-                    BGHregion.levelRegion:Hide()
+                    levelRegion:Hide()
                 else
-                    BGHregion.levelRegion:Show()
+                    levelRegion:Show()
                 end
             else
-                BGHregion.levelRegion:Show()
+                levelRegion:Show()
             end
         else
-            BGHregion.levelRegion:Show()
+            levelRegion:Show()
         end
     else
-        BGHregion.levelRegion:Show()
+        levelRegion:Show()
     end
 end
 
 ------------- Update the icon texture if it changes  -------------
-local function UpdateTextures(BGHregion)
-    local texture = MarkedNames[BGHregion.activeName]
-    local levelRegion = BGHregion.levelRegion
+local function UpdateTextures(BGHframe)
+    local texture = MarkedNames[BGHframe.activeName]
     if texture then
-        if texture ~= BGHregion.prevTexture then
-            BGHregion.icon:SetTexture(texture)
-            BGHregion.icon:Show()
-            BGHregion.prevTexture = texture
+        if texture ~= BGHframe.prevTexture then
+            BGHframe.icon:SetTexture(texture)
+            BGHframe.icon:Show()
+            BGHframe.prevTexture = texture
         end
     else
-        BGHregion.icon:Hide()
-        BGHregion.prevTexture = nil   
+        BGHframe.icon:Hide()
+        BGHframe.prevTexture = nil   
     end
     -- Hide Blizz default plate's level text if it overlaps with the icon
     if BlizzPlates then  
-        HandleLevelTextOverlap(BGHregion)
+        HandleLevelTextOverlap(BGHframe)
     end
 end
 
 ------------ Update all mark frames when the configuration changes  ------------
 local function UpdateAllMarks()
-    for _, BGHregion in pairs(GlobalNamePlates) do
-        if BGHregion.icon then
-            BGHregion.icon:ClearAllPoints()
+    for plate, BGHframe in pairs(GlobalNamePlates) do
+        if BGHframe.icon then
+            BGHframe.icon:ClearAllPoints()
             local anchorData = anchorMapping[BGHsettings.iconAnchor or "top"]
-            BGHregion.icon:SetPoint(
+            BGHframe.icon:SetPoint(
                 anchorData.anchorPoint,
-                BGHregion:GetParent(),
+                plate,
                 anchorData.relativePoint,
                 BGHsettings.iconXoffset + anchorData.xOffset,
                 BGHsettings.iconYoffset + anchorData.yOffset
             )
-            BGHregion.icon:SetSize(BGHsettings.iconSize, BGHsettings.iconSize)
-            UpdateTextures(BGHregion)
+            BGHframe.icon:SetSize(BGHsettings.iconSize, BGHsettings.iconSize)
+            UpdateTextures(BGHframe)
         end
     end
 end
 
-local function NamePlate_OnShow(BGHregion)
-    local name = BGHregion.nameRegion:GetText()
-    BGHregion.activeName = name
-    ActiveNamePlates[name] = BGHregion
+local function BGHonShow(BGHframe)
+    local name = BGHframe.nameRegion:GetText()
+    BGHframe.activeName = name
+    ActiveNamePlates[name] = BGHframe
     if MarkedNames[name] then
-        UpdateTextures(BGHregion)
+        UpdateTextures(BGHframe)
     end 
 end
 
-local function NamePlate_OnHide(BGHregion)
-    BGHregion.icon:Hide()
-    ActiveNamePlates[BGHregion.activeName], BGHregion.activeName, BGHregion.prevTexture = nil
+local function BGHonHide(BGHframe)
+    BGHframe.icon:Hide()
+    ActiveNamePlates[BGHframe.activeName], BGHframe.activeName, BGHframe.prevTexture = nil
 end
 
-local function NamePlate_OnUpdate(BGHregion)
-    if BGHregion.nameRegion:GetText() ~= BGHregion.activeName then
-        NamePlate_OnHide(BGHregion)
-        NamePlate_OnShow(BGHregion)
-        BGHregion.activeName = BGHregion.nameRegion:GetText()
+local function BGHonUpdate(BGHframe)
+    if BGHframe.nameRegion:GetText() ~= BGHframe.activeName then
+        BGHonHide(BGHframe)
+        BGHonShow(BGHframe)
+        BGHframe.activeName = BGHframe.nameRegion:GetText()
     end
 end
 
-
 ---- Checks if the frame is a nameplate ----
 local function IsNamePlate(frame)
-    if frame:GetName() then return false end
-    local region = select(2, frame:GetRegions())
-    return region and region:GetTexture() == "Interface\\Tooltips\\Nameplate-Border"
+    if frame.RealPlate  -- KhalPlates
+    or frame.extended   -- TidyPlates
+    or frame.UnitFrame  -- ElvUI
+    or frame.kui        -- KuiNameplates
+    or frame.aloftData  -- Aloft
+    then
+        return true
+    end
+    local _, r2 = frame:GetRegions()
+    return r2 and r2:GetObjectType() == "Texture" and r2:GetTexture() == "Interface\\Tooltips\\Nameplate-Border"
 end
 
--------- Setup a frame that manages the mark texture parameters  --------
-local function SetupNamePlate(plate)
-    local _, _, _, _, _, _, nameRegion, levelRegion = plate:GetRegions()
-    if plate.extended then -- Using TidyPlates custom frames if available
-        plate = plate.extended
-        if not TidyPlatesCheck then
+---- Checks and replaces the nameplate anchor if custom ----
+local function CheckCustomPlate(nameplate)
+    local nameRegion, levelRegion = select(7, nameplate:GetRegions())
+    if nameplate.RealPlate then -- KhalPlates
+        if not KhalPlatesCheck then
+            KhalPlatesCheck = true
             BlizzPlates = false
-            TidyPlatesCheck = true
-            anchorMapping = {
-                ["left"] = {
-                    anchorPoint = "RIGHT", relativePoint = "LEFT",
-                    xOffset = 3, yOffset = 0
-                },
-                ["top"] = {
-                    anchorPoint = "BOTTOM", relativePoint = "TOP",
-                    xOffset = 0, yOffset = -5
-                },
-                ["right"] = {
-                    anchorPoint = "LEFT", relativePoint = "RIGHT",
-                    xOffset = -3, yOffset = 0
-                },
-            }
-            if BGHsettings.showMessages == 1 then 
-                BGHprint(L["TidyPlates detected, anchors adjusted."]) 
-            end
-        end
-    elseif plate.RealPlate then -- Using _VirtualPlates custom frames if available
-        if not VirtualPlatesCheck then
-            BlizzPlates = false
-            VirtualPlatesCheck = true
             anchorMapping = {
                 ["left"] = {
                     anchorPoint = "RIGHT", relativePoint = "LEFT",
@@ -350,51 +337,139 @@ local function SetupNamePlate(plate)
                     xOffset = -16, yOffset = 13
                 },
             }
-            if BGHsettings.showMessages == 1 then 
-                BGHprint(L["_VirtualPlates detected, anchors adjusted."]) 
-            end
+        end
+    elseif nameplate.extended then -- TidyPlates
+        nameplate = nameplate.extended
+        if not TidyPlatesCheck then
+            TidyPlatesCheck = true
+            BlizzPlates = false
+            anchorMapping = {
+                ["left"] = {
+                    anchorPoint = "RIGHT", relativePoint = "LEFT",
+                    xOffset = 3, yOffset = 0
+                },
+                ["top"] = {
+                    anchorPoint = "BOTTOM", relativePoint = "TOP",
+                    xOffset = 0, yOffset = -5
+                },
+                ["right"] = {
+                    anchorPoint = "LEFT", relativePoint = "RIGHT",
+                    xOffset = -3, yOffset = 0
+                },
+            }
+        end
+    elseif nameplate.UnitFrame then -- ElvUI
+        if ElvUIdynamicAnchor and nameplate.UnitFrame.Health then
+            nameplate = nameplate.UnitFrame.Health
+        else
+            nameplate = nameplate.UnitFrame
+        end
+        if not ElvUICheck then
+            ElvUICheck = true
+            BlizzPlates = false
+            anchorMapping = {
+                ["left"] = {
+                    anchorPoint = "RIGHT", relativePoint = "LEFT",
+                    xOffset = 2, yOffset = 1
+                },
+                ["top"] = {
+                    anchorPoint = "BOTTOM", relativePoint = "TOP",
+                    xOffset = 0, yOffset = 12
+                },
+                ["right"] = {
+                    anchorPoint = "LEFT", relativePoint = "RIGHT",
+                    xOffset = -2, yOffset = 1
+                },
+            }
+        end
+    elseif nameplate.kui then -- KuiNameplates
+        nameRegion, levelRegion = nameplate.kui.oldName, nameplate.kui.level
+        if not KuiNameplatesCheck then
+            KuiNameplatesCheck = true
+            BlizzPlates = false
+            anchorMapping = {
+                ["left"] = {
+                    anchorPoint = "RIGHT", relativePoint = "LEFT",
+                    xOffset = 38, yOffset = 0
+                },
+                ["top"] = {
+                    anchorPoint = "BOTTOM", relativePoint = "TOP",
+                    xOffset = 0, yOffset = -10
+                },
+                ["right"] = {
+                    anchorPoint = "LEFT", relativePoint = "RIGHT",
+                    xOffset = -39, yOffset = 0
+                },
+            }
+        end
+    elseif nameplate.aloftData then -- Aloft
+        if not AloftCheck then
+            AloftCheck = true
+            BlizzPlates = false
+            anchorMapping = {
+                ["left"] = {
+                    anchorPoint = "RIGHT", relativePoint = "LEFT",
+                    xOffset = 4, yOffset = 0
+                },
+                ["top"] = {
+                    anchorPoint = "BOTTOM", relativePoint = "TOP",
+                    xOffset = 0, yOffset = -1
+                },
+                ["right"] = {
+                    anchorPoint = "LEFT", relativePoint = "RIGHT",
+                    xOffset = -5, yOffset = 0
+                },
+            }
         end
     end
-    local BGHregion = CreateFrame("Frame", nil, plate)
-    GlobalNamePlates[plate] = BGHregion
-    BGHregion:SetFrameStrata("TOOLTIP")
-    BGHregion.icon = plate:CreateTexture(nil, "OVERLAY")
-    BGHregion.icon:ClearAllPoints()
+    return nameplate, nameRegion, levelRegion
+end
+
+-------- Setup a frame that manages the mark texture parameters  --------
+local function SetupNamePlate(nameplate)
+    local plate, nameRegion, levelRegion = CheckCustomPlate(nameplate)
+    local BGHframe = CreateFrame("Frame", nil, plate)
+    plate.BGHframe = BGHframe
+    GlobalNamePlates[plate] = BGHframe
+    BGHframe.icon = BGHframe:CreateTexture(nil, "OVERLAY")
+    BGHframe.icon:ClearAllPoints()
     local anchorData = anchorMapping[BGHsettings.iconAnchor or "top"]
-    BGHregion.icon:SetPoint(
+    BGHframe.icon:SetPoint(
         anchorData.anchorPoint,
-        BGHregion:GetParent(),
+        plate,
         anchorData.relativePoint,
         BGHsettings.iconXoffset + anchorData.xOffset,
         BGHsettings.iconYoffset + anchorData.yOffset
     )
-    BGHregion.icon:SetSize(BGHsettings.iconSize, BGHsettings.iconSize)
-    BGHregion.nameRegion = nameRegion
-    BGHregion.activeName = nameRegion:GetText()
-    ActiveNamePlates[BGHregion.activeName] = plate
-    BGHregion.levelRegion = levelRegion
-    BGHregion.levelRegion:SetDrawLayer("ARTWORK")
-    NamePlate_OnShow(BGHregion)
-    UpdateTextures(BGHregion)
-    BGHregion:SetScript("OnUpdate", NamePlate_OnUpdate)
-    BGHregion:SetScript("OnShow", NamePlate_OnShow)
-    BGHregion:SetScript("OnHide", NamePlate_OnHide)
+    BGHframe.icon:SetSize(BGHsettings.iconSize, BGHsettings.iconSize)
+    BGHframe.nameRegion = nameRegion
+    BGHframe.activeName = nameRegion:GetText()
+    ActiveNamePlates[BGHframe.activeName] = plate
+    BGHframe.levelRegion = levelRegion
+    BGHframe.levelRegion:SetDrawLayer("ARTWORK")
+    BGHonShow(BGHframe)
+    UpdateTextures(BGHframe)
+    BGHframe:SetScript("OnUpdate", BGHonUpdate)
+    BGHframe:SetScript("OnShow", BGHonShow)
+    BGHframe:SetScript("OnHide", BGHonHide)
 end
 
 ------ Detects when the number of nameplates in the WorldFrame increases  ------
-local prevChildCount = 1
-CreateFrame("Frame"):SetScript("OnUpdate", function(self, elapsed)
-    if prevChildCount ~= WorldFrame:GetNumChildren() then
-        for _, ChildFrame in next, { WorldFrame:GetChildren() }, prevChildCount do
-            if IsNamePlate(ChildFrame) then
-                -- 1 frame delay to ensure TidyPlates' plate.extended is available --
-                CreateFrame("Frame"):SetScript("OnUpdate", function(self, elapsed)
-                    self:SetScript("OnUpdate", nil)
-                    SetupNamePlate(ChildFrame)
-                end)
-            end
+local ChildCount, NewChildCount = 0
+CreateFrame("Frame"):SetScript("OnUpdate", function()
+    NewChildCount = WorldFrame:GetNumChildren()
+    if ChildCount ~= NewChildCount then
+        for i = ChildCount + 1, NewChildCount do
+            local child = select(i, WorldFrame:GetChildren())
+            -- 1 frame delay to ensure custom nameplate is available --
+            CreateFrame("Frame"):SetScript("OnUpdate", function(self)
+                self:Hide()
+                if IsNamePlate(child) then
+                    SetupNamePlate(child)
+                end
+            end)
         end
-        prevChildCount = WorldFrame:GetNumChildren()
+        ChildCount = NewChildCount
     end
 end)
 

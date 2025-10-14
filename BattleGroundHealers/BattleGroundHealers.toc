@@ -1,6 +1,6 @@
 ## Interface: 30300
 ## Title: BattleGroundHealers
-## Version: 1.4
+## Version: 1.5
 ## Notes: Marks BG healer nameplates with a configurable icon.
 ## Author: |cffc41f3bKhal|r
 ## SavedVariables: BGHsettings
