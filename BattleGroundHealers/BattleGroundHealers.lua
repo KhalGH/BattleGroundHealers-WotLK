@@ -44,8 +44,8 @@ local DefaultSettings = {
 
 local setmetatable, print, next, ipairs, pairs, rawget, select, pcall, string_format, string_lower, string_find, table_insert, table_remove, math_sqrt, math_abs, math_floor, math_min, math_max, tonumber =
       setmetatable, print, next, ipairs, pairs, rawget, select, pcall, string.format, string.lower, string.find, table.insert, table.remove, math.sqrt, math.abs, math.floor, math.min, math.max, tonumber
-local CreateFrame, GetSpellInfo, SetBattlefieldScoreFaction, RequestBattlefieldScoreData, GetNumBattlefieldScores, GetBattlefieldScore, IsInInstance, CombatLogClearEntries, SetMapToCurrentZone, GetCurrentMapAreaID, SendChatMessage, UnitName, UnitAura, UnitCanAttack, GetTime, wipe =
-      CreateFrame, GetSpellInfo, SetBattlefieldScoreFaction, RequestBattlefieldScoreData, GetNumBattlefieldScores, GetBattlefieldScore, IsInInstance, CombatLogClearEntries, SetMapToCurrentZone, GetCurrentMapAreaID, SendChatMessage, UnitName, UnitAura, UnitCanAttack, GetTime, wipe
+local CreateFrame, GetSpellInfo, GetBattlefieldStatus, SetBattlefieldScoreFaction, RequestBattlefieldScoreData, GetNumBattlefieldScores, GetBattlefieldScore, IsInInstance, CombatLogClearEntries, SetMapToCurrentZone, GetCurrentMapAreaID, SendChatMessage, UnitName, UnitAura, UnitCanAttack, GetTime, wipe =
+      CreateFrame, GetSpellInfo, GetBattlefieldStatus, SetBattlefieldScoreFaction, RequestBattlefieldScoreData, GetNumBattlefieldScores, GetBattlefieldScore, IsInInstance, CombatLogClearEntries, SetMapToCurrentZone, GetCurrentMapAreaID, SendChatMessage, UnitName, UnitAura, UnitCanAttack, GetTime, wipe
 local UIDropDownMenu_SetWidth, UIDropDownMenu_SetText, UIDropDownMenu_Initialize, UIDropDownMenu_CreateInfo, UIDropDownMenu_AddButton, StaticPopup_Show, InterfaceOptions_AddCategory =
       UIDropDownMenu_SetWidth, UIDropDownMenu_SetText, UIDropDownMenu_Initialize, UIDropDownMenu_CreateInfo, UIDropDownMenu_AddButton, StaticPopup_Show, InterfaceOptions_AddCategory
 local LOCALIZED_CLASS_NAMES_MALE, LOCALIZED_CLASS_NAMES_FEMALE, RAID_CLASS_COLORS, WorldFrame, WorldStateScoreFrame =
@@ -76,6 +76,12 @@ local ElvUIdynamicAnchor = true -- Forces the icon to follow ElvUI's HealthBar (
 local KuiNameplatesCheck = false
 local AloftCheck = false
 local debugMode = false
+
+local BGStatus = {
+	[1] = true,
+	[2] = true,
+	[3] = true
+}
 
 BGH.AllianceCount = 0
 BGH.HordeCount = 0
@@ -1396,43 +1402,63 @@ local function AddInterfaceOptions()
     InterfaceOptions_AddCategory(addonPanel)
 end
 
+--------- Reset tracking state before joining other BG ---------
+local function ResetTrackingState()
+    BGH:SetScript("OnUpdate",nil)
+    CLEUframe:SetScript("OnEvent", nil)
+    CLEUframe:UnregisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
+    CLEUframe:UnregisterEvent("UNIT_SPELLCAST_SUCCEEDED")
+    CLEUregistered = false
+    USSregistered = false
+    playerFaction = false  
+    currentBGplayers = {} 
+    lastUpdateTime = 0
+    lastCLEUtime = nil
+    CLEUtimeout = nil
+    CLEUcheck = false
+    ClearHealers(CLEUhealers)
+    ClearHealers(WSSFhealers)
+    BGH.AllianceCount = 0
+    BGH.HordeCount = 0
+end
+
 ------------------- Script to manage the addon's main frame events -------------------
 BGH:RegisterEvent("ADDON_LOADED")
 BGH:RegisterEvent("PLAYER_ENTERING_WORLD")
+BGH:RegisterEvent("UPDATE_BATTLEFIELD_STATUS")
 BGH:SetScript("OnEvent", function(self, event, ...)
     if event == "ADDON_LOADED" and (...) == addonName then
         AddInterfaceOptions()
         InitSettings()
         print(string_format(" |cff00FF98BattleGroundHealers|r v%.1f by |cffc41f3bKhal|r", version))
+        self:UnregisterEvent("ADDON_LOADED")
     elseif event == "PLAYER_ENTERING_WORLD" then
         local _, instanceType = IsInInstance()
         if instanceType == "pvp" then
-            RequestBattlefieldScoreData()
-            UpdateCurrentBGplayers()
-            UpdateWSSFhealers()
-            UpdateCLEUstate()
+            if not inBG then
+                RequestBattlefieldScoreData()
+                UpdateCurrentBGplayers()
+                UpdateWSSFhealers()
+                UpdateCLEUstate()
+            end
+            inBG = true
             self:SetScript("OnUpdate", OnUpdate) 
             CLEUframe:SetScript("OnEvent", CLEUhandler)
-            inBG = true
         elseif inBG then
-            self:SetScript("OnUpdate",nil)
-            CLEUframe:SetScript("OnEvent", nil)
-            CLEUframe:UnregisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
-            CLEUframe:UnregisterEvent("UNIT_SPELLCAST_SUCCEEDED")
-            CLEUregistered = false
-            USSregistered = false
             inBG = false
-            playerFaction = false  
-            currentBGplayers = {} 
-            lastUpdateTime = 0
-            lastCLEUtime = nil
-            CLEUtimeout = nil
-            CLEUcheck = false
-            ClearHealers(CLEUhealers)
-            ClearHealers(WSSFhealers)
-            self.AllianceCount = 0
-            self.HordeCount = 0
+            ResetTrackingState()
         end
+    elseif event == "UPDATE_BATTLEFIELD_STATUS" then
+		local bgIndex = ...
+		local status = GetBattlefieldStatus(bgIndex)
+		if status == "active" then
+			if not BGStatus[bgIndex] then
+                ResetTrackingState()
+			end
+			BGStatus[bgIndex] = true
+		else
+			BGStatus[bgIndex] = false
+		end
     end
 end)
 
