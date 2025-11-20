@@ -292,7 +292,7 @@ local function BGHonShow(BGHframe)
     ActiveNamePlates[name] = BGHframe
     if MarkedNames[name] then
         UpdateTextures(BGHframe)
-    end 
+    end
 end
 
 local function BGHonHide(BGHframe)
@@ -436,6 +436,7 @@ local function SetupNamePlate(nameplate)
     local plate, nameRegion, levelRegion = CheckCustomPlate(nameplate)
     local BGHframe = CreateFrame("Frame", nil, plate)
     plate.BGHframe = BGHframe
+    BGHframe.parentPlate = plate
     GlobalNamePlates[plate] = BGHframe
     BGHframe.icon = BGHframe:CreateTexture(nil, "OVERLAY")
     BGHframe.icon:ClearAllPoints()
@@ -448,6 +449,22 @@ local function SetupNamePlate(nameplate)
         BGHsettings.iconYoffset + anchorData.yOffset
     )
     BGHframe.icon:SetSize(BGHsettings.iconSize, BGHsettings.iconSize)
+    if KhalPlatesCheck then
+        function BGHframe:UpdateAnchor()
+            self.icon:ClearAllPoints()
+            if plate.RealPlate.classPlateIsShown then
+                self.icon:SetPoint("BOTTOM", plate, "TOP", 0, 2)
+            else
+                self.icon:SetPoint(
+                    anchorData.anchorPoint,
+                    plate,
+                    anchorData.relativePoint,
+                    BGHsettings.iconXoffset + anchorData.xOffset,
+                    BGHsettings.iconYoffset + anchorData.yOffset
+                )
+            end
+        end
+    end
     BGHframe.nameRegion = nameRegion
     BGHframe.activeName = nameRegion:GetText()
     ActiveNamePlates[BGHframe.activeName] = plate
@@ -1384,7 +1401,7 @@ local function AddInterfaceOptions()
         description:SetJustifyV("TOP")
         description:SetShadowColor(0, 0, 0)
         description:SetShadowOffset(1, -1)
-        description:SetFormattedText(L["Marks BG healer nameplates with a configurable icon.\nSupports two detection methods that can work simultaneously.\n\nAuthor: |cffc41f3bKhal|r\nVersion: %.1f"], version)
+        description:SetFormattedText(L["Marks BG healer nameplates with a configurable icon.\nSupports two detection methods that can work simultaneously.\n\nAuthor: |cffc41f3bKhal|r\nVersion: %s"], version)
         description:SetNonSpaceWrap(true)
         local settingsButton = CreateFrame("Button", nil, self, "UIPanelButtonTemplate")
         settingsButton:SetSize(100, 30)
@@ -1430,7 +1447,7 @@ BGH:SetScript("OnEvent", function(self, event, ...)
     if event == "ADDON_LOADED" and (...) == addonName then
         AddInterfaceOptions()
         InitSettings()
-        print(string_format(" |cff00FF98BattleGroundHealers|r v%.1f by |cffc41f3bKhal|r", version))
+        print(string_format(" |cff00FF98BattleGroundHealers|r v%s by |cffc41f3bKhal|r", version))
         self:UnregisterEvent("ADDON_LOADED")
     elseif event == "PLAYER_ENTERING_WORLD" then
         local _, instanceType = IsInInstance()

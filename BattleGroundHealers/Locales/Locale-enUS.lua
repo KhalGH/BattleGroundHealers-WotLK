@@ -45,7 +45,7 @@ BattleGroundHealers_Localization = {
 	["Current BG Scoreboard healing tracking threshold:"] = true,
 	["BG Scoreboard healing tracking threshold set to:"] = true,
 	["Value is not a number"] = true,
-	["Marks BG healer nameplates with a configurable icon.\nSupports two detection methods that can work simultaneously.\n\nAuthor: |cffc41f3bKhal|r\nVersion: %.1f"] = true,
+	["Marks BG healer nameplates with a configurable icon.\nSupports two detection methods that can work simultaneously.\n\nAuthor: |cffc41f3bKhal|r\nVersion: %s"] = true,
 }
 
 function BattleGroundHealers_Localization:CreateLocaleTable(t)

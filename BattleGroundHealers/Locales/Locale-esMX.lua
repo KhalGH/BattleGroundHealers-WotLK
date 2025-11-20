@@ -47,5 +47,5 @@ BattleGroundHealers_Localization:CreateLocaleTable({
 	["Current BG Scoreboard healing tracking threshold:"] = "Umbral de sanación actual para la detección por Tabla de Puntuación de BG:",
 	["BG Scoreboard healing tracking threshold set to:"] = "Umbral de sanación para la detección por Tabla de Puntuación de BG establecido en:",
 	["Value is not a number"] = "Ingresa un valor numérico válido",
-	["Marks BG healer nameplates with a configurable icon.\nSupports two detection methods that can work simultaneously.\n\nAuthor: |cffc41f3bKhal|r\nVersion: %.1f"] = "Marca los nameplates de los healers en BG con un ícono configurable.\nProporciona dos métodos de detección que pueden trabajar en simultáneo.\n\nAutor: |cffc41f3bKhal|r\nVersión: %.1f",
+	["Marks BG healer nameplates with a configurable icon.\nSupports two detection methods that can work simultaneously.\n\nAuthor: |cffc41f3bKhal|r\nVersion: %s"] = "Marca los nameplates de los healers en BG con un ícono configurable.\nProporciona dos métodos de detección que pueden trabajar en simultáneo.\n\nAutor: |cffc41f3bKhal|r\nVersión: %s",
 })
