@@ -42,8 +42,8 @@ local DefaultSettings = {
     showMessages = 1,           -- Addon chat messages (1 = enabled, 0 = disabled)
 }
 
-local setmetatable, print, next, ipairs, pairs, rawget, select, pcall, string_format, string_lower, string_find, table_insert, table_remove, math_sqrt, math_abs, math_floor, math_min, math_max, tonumber =
-      setmetatable, print, next, ipairs, pairs, rawget, select, pcall, string.format, string.lower, string.find, table.insert, table.remove, math.sqrt, math.abs, math.floor, math.min, math.max, tonumber
+local setmetatable, print, next, ipairs, pairs, unpack, rawget, select, pcall, string_format, string_lower, string_find, table_insert, table_remove, math_sqrt, math_abs, math_floor, math_min, math_max, tonumber =
+      setmetatable, print, next, ipairs, pairs, unpack, rawget, select, pcall, string.format, string.lower, string.find, table.insert, table.remove, math.sqrt, math.abs, math.floor, math.min, math.max, tonumber
 local CreateFrame, GetSpellInfo, GetBattlefieldStatus, SetBattlefieldScoreFaction, RequestBattlefieldScoreData, GetNumBattlefieldScores, GetBattlefieldScore, IsInInstance, CombatLogClearEntries, SetMapToCurrentZone, GetCurrentMapAreaID, SendChatMessage, UnitName, UnitAura, UnitCanAttack, GetTime, wipe =
       CreateFrame, GetSpellInfo, GetBattlefieldStatus, SetBattlefieldScoreFaction, RequestBattlefieldScoreData, GetNumBattlefieldScores, GetBattlefieldScore, IsInInstance, CombatLogClearEntries, SetMapToCurrentZone, GetCurrentMapAreaID, SendChatMessage, UnitName, UnitAura, UnitCanAttack, GetTime, wipe
 local UIDropDownMenu_SetWidth, UIDropDownMenu_SetText, UIDropDownMenu_Initialize, UIDropDownMenu_CreateInfo, UIDropDownMenu_AddButton, StaticPopup_Show, InterfaceOptions_AddCategory =
@@ -449,22 +449,6 @@ local function SetupNamePlate(nameplate)
         BGHsettings.iconYoffset + anchorData.yOffset
     )
     BGHframe.icon:SetSize(BGHsettings.iconSize, BGHsettings.iconSize)
-    if KhalPlatesCheck then
-        function BGHframe:UpdateAnchor()
-            self.icon:ClearAllPoints()
-            if plate.RealPlate.classPlateIsShown then
-                self.icon:SetPoint("BOTTOM", plate, "TOP", 0, 2)
-            else
-                self.icon:SetPoint(
-                    anchorData.anchorPoint,
-                    plate,
-                    anchorData.relativePoint,
-                    BGHsettings.iconXoffset + anchorData.xOffset,
-                    BGHsettings.iconYoffset + anchorData.yOffset
-                )
-            end
-        end
-    end
     BGHframe.nameRegion = nameRegion
     BGHframe.activeName = nameRegion:GetText()
     ActiveNamePlates[BGHframe.activeName] = plate
@@ -475,6 +459,34 @@ local function SetupNamePlate(nameplate)
     BGHframe:SetScript("OnUpdate", BGHonUpdate)
     BGHframe:SetScript("OnShow", BGHonShow)
     BGHframe:SetScript("OnHide", BGHonHide)
+    function BGHframe:ModifyIcon(shouldModify, newParent, iconSize, anchorPoint, relativeFrame, relativePoint, xOffset, yOffset)
+        self.icon:ClearAllPoints()
+        if shouldModify then
+            self.icon:SetPoint(
+                anchorPoint,
+                relativeFrame,
+                relativePoint,
+                xOffset,
+                yOffset
+            )
+            self.icon:SetSize(iconSize, iconSize)
+            self:SetParent(newParent)
+        else
+            self.icon:SetPoint(
+                anchorData.anchorPoint,
+                plate,
+                anchorData.relativePoint,
+                BGHsettings.iconXoffset + anchorData.xOffset,
+                BGHsettings.iconYoffset + anchorData.yOffset
+            )
+            self.icon:SetSize(BGHsettings.iconSize, BGHsettings.iconSize)
+            self:SetParent(plate)
+        end
+    end
+    if plate.shouldModifyBGH then
+        BGHframe:ModifyIcon(unpack(plate.shouldModifyBGH))
+        plate.shouldModifyBGH = nil
+    end
 end
 
 ------ Detects when the number of nameplates in the WorldFrame increases  ------
