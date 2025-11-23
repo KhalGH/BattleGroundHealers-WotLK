@@ -31,11 +31,11 @@
 - **`/bgh hth <#>`** → Modifies healing threshold for BG Scoreboard detection.    
 
 ## Installation  
-1. [Download](https://github.com/KhalGH/BattleGroundHealers-WotLK/releases/download/v1.5.1/BattleGroundHealers-v1.5.1.zip) the addon
+1. [Download](https://github.com/KhalGH/BattleGroundHealers-WotLK/releases/download/v1.5.2/BattleGroundHealers-v1.5.2.zip) the addon
 2. Extract the **BattleGroundHealers** folder into `World of Warcraft/Interface/AddOns/`.  
 3. Restart the game and enable the addon.  
 
 ## Information  
-- **Addon Version:** 1.5.1  
+- **Addon Version:** 1.5.2  
 - **Game Version:** 3.3.5a (WotLK)  
 - **Author:** Khal  
