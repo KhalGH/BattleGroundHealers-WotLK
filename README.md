@@ -16,7 +16,7 @@
 - Allows printing the list of detected healers to personal or public chat channels.
 - Implemented callback to provide healer detection data to [BattlegroundTargets](https://github.com/KhalGH/BattlegroundTargets-WotLK).
 - Exposes a global variable with the healer count per faction for [BattleGroundBalance](https://github.com/KhalGH/BattleGroundBalance-WotLK).
-- Compatible with native nameplates, TidyPlates, ElvUI, KuiNameplates, Aloft and RefinedBlizzPlates.
+- Compatible with default nameplates and most custom nameplate addons.
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/KhalGH/BattleGroundHealers-WotLK/refs/heads/assets/assets/BattleGroundHealersUI.jpg" 
@@ -31,11 +31,11 @@
 - **`/bgh hth <#>`** → Modifies healing threshold for BG Scoreboard detection.    
 
 ## Installation  
-1. [Download](https://github.com/KhalGH/BattleGroundHealers-WotLK/releases/download/v1.5.2/BattleGroundHealers-v1.5.2.zip) the addon
+1. [Download](https://github.com/KhalGH/BattleGroundHealers-WotLK/releases/download/v1.6.0/BattleGroundHealers-v1.6.0.zip) the addon
 2. Extract the **BattleGroundHealers** folder into `World of Warcraft/Interface/AddOns/`.  
 3. Restart the game and enable the addon.  
 
 ## Information  
-- **Addon Version:** 1.5.2  
+- **Addon Version:** 1.6.0  
 - **Game Version:** 3.3.5a (WotLK)  
 - **Author:** Khal  
