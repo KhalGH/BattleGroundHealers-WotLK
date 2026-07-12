@@ -23,8 +23,8 @@
 -----------------------------------------------------------------------------------------------------
 -----------------------------------------------------------------------------------------------------
 
-local addonName = ...
-local version = GetAddOnMetadata(addonName, "Version")
+local AddonName, BGH = ...
+local version = GetAddOnMetadata(AddonName, "Version")
 
 local DefaultSettings = {
     CLEUtracking = 1,           -- Detect healers via Combat Log (1 = enabled, 0 = disabled)
@@ -32,7 +32,7 @@ local DefaultSettings = {
     WSSFtracking = 1,           -- Detect healers via BG Scoreboard (1 = enabled, 0 = disabled)
     h2dRatio = 2.5,             -- BG Scoreboard healing-to-damage ratio threshold (1 to 5)
     healingThreshold = 50000,   -- BG Scoreboard healing detection threshold (10k to 100k)
-    printChannel = "BG",        -- Channel to print the healers list ("BG", "Party", "Guild" or "Self")
+    printChannel = "BG",        -- Channel to print the healers list ("BG", "Party", "Raid", "Guild" or "Self")
     iconStyle = "Blizzlike",    -- Icon style ("Blizzlike" or "Minimalist")
     iconSize = 40,              -- Icon size (20 to 40)
     iconAnchor = "top",         -- Icon anchor relative to the nameplate ("left", "top" or "right")
@@ -42,49 +42,39 @@ local DefaultSettings = {
     showMessages = 1,           -- Addon chat messages (1 = enabled, 0 = disabled)
 }
 
-local setmetatable, print, next, ipairs, pairs, unpack, rawget, select, pcall, string_format, string_lower, string_find, table_insert, table_remove, math_sqrt, math_abs, math_floor, math_min, math_max, tonumber =
-      setmetatable, print, next, ipairs, pairs, unpack, rawget, select, pcall, string.format, string.lower, string.find, table.insert, table.remove, math.sqrt, math.abs, math.floor, math.min, math.max, tonumber
-local CreateFrame, GetSpellInfo, GetBattlefieldStatus, SetBattlefieldScoreFaction, RequestBattlefieldScoreData, GetNumBattlefieldScores, GetBattlefieldScore, IsInInstance, CombatLogClearEntries, SetMapToCurrentZone, GetCurrentMapAreaID, SendChatMessage, UnitName, UnitAura, UnitCanAttack, GetTime, wipe =
-      CreateFrame, GetSpellInfo, GetBattlefieldStatus, SetBattlefieldScoreFaction, RequestBattlefieldScoreData, GetNumBattlefieldScores, GetBattlefieldScore, IsInInstance, CombatLogClearEntries, SetMapToCurrentZone, GetCurrentMapAreaID, SendChatMessage, UnitName, UnitAura, UnitCanAttack, GetTime, wipe
-local UIDropDownMenu_SetWidth, UIDropDownMenu_SetText, UIDropDownMenu_Initialize, UIDropDownMenu_CreateInfo, UIDropDownMenu_AddButton, StaticPopup_Show, InterfaceOptions_AddCategory =
-      UIDropDownMenu_SetWidth, UIDropDownMenu_SetText, UIDropDownMenu_Initialize, UIDropDownMenu_CreateInfo, UIDropDownMenu_AddButton, StaticPopup_Show, InterfaceOptions_AddCategory
+local setmetatable, print, next, ipairs, pairs, unpack, rawset, rawget, select, pcall, string_format, string_lower, string_find, table_insert, table_remove, math_sqrt, math_abs, math_floor, math_min, math_max, tonumber =
+      setmetatable, print, next, ipairs, pairs, unpack, rawset, rawget, select, pcall, string.format, string.lower, string.find, table.insert, table.remove, math.sqrt, math.abs, math.floor, math.min, math.max, tonumber
+local CreateFrame, GetSpellInfo, GetBattlefieldStatus, SetBattlefieldScoreFaction, RequestBattlefieldScoreData, GetNumBattlefieldScores, GetBattlefieldScore, GetNumRaidMembers, GetRaidRosterInfo, IsInInstance, CombatLogClearEntries, GetRealZoneText, SetMapToCurrentZone, GetCurrentMapAreaID, GetPlayerMapPosition, SendChatMessage, UnitName, UnitFactionGroup, UnitAura, UnitCanAttack, GetTime, GetPlayerInfoByGUID, GetWorldStateUIInfo, wipe, GetCVar, SetCVar =
+      CreateFrame, GetSpellInfo, GetBattlefieldStatus, SetBattlefieldScoreFaction, RequestBattlefieldScoreData, GetNumBattlefieldScores, GetBattlefieldScore, GetNumRaidMembers, GetRaidRosterInfo, IsInInstance, CombatLogClearEntries, GetRealZoneText, SetMapToCurrentZone, GetCurrentMapAreaID, GetPlayerMapPosition, SendChatMessage, UnitName, UnitFactionGroup, UnitAura, UnitCanAttack, GetTime, GetPlayerInfoByGUID, GetWorldStateUIInfo, wipe, GetCVar, SetCVar
+local UIDropDownMenu_SetWidth, UIDropDownMenu_SetText, UIDropDownMenu_Initialize, UIDropDownMenu_CreateInfo, UIDropDownMenu_AddButton, StaticPopup_Show, InterfaceOptions_AddCategory, InterfaceOptionsFrameCancel_OnClick, HideUIPanel =
+      UIDropDownMenu_SetWidth, UIDropDownMenu_SetText, UIDropDownMenu_Initialize, UIDropDownMenu_CreateInfo, UIDropDownMenu_AddButton, StaticPopup_Show, InterfaceOptions_AddCategory, InterfaceOptionsFrameCancel_OnClick, HideUIPanel
 local LOCALIZED_CLASS_NAMES_MALE, LOCALIZED_CLASS_NAMES_FEMALE, RAID_CLASS_COLORS, WorldFrame, WorldStateScoreFrame =
       LOCALIZED_CLASS_NAMES_MALE, LOCALIZED_CLASS_NAMES_FEMALE, RAID_CLASS_COLORS, WorldFrame, WorldStateScoreFrame
 
-local BGH = CreateFrame("Frame", "BattleGroundHealers")
-local CLEUframe = CreateFrame("Frame")
-local L = BattleGroundHealers_Localization
-local HEX_COLOR_ALLIANCE = "|cff00aeef"
-local HEX_COLOR_HORDE = "|cffe63c3c"
-local HEX_GREEN = "|cff88FF88"
-local HEX_RED = "|cffff4444"
+local BGH_Public = CreateFrame("Frame", "BattleGroundHealers")
+local EventHandler = CreateFrame("Frame")
+local AllNamePlates = {}
+local FriendlyPlates = {}
+local EnemyPlates = {}
+local MarkedNames = {}
+local CurrentBGplayers = {}
+local FriendlyHealerCandidates = {}
 local CLEUhealers = {}
 local WSSFhealers = {}
-local GlobalNamePlates = {}
-local ActiveNamePlates = {}
-local MarkedNames = {}
-local currentBGplayers = {}
 local inBG = false
 local CLEUregistered = false
 local USSregistered = false
 local playerFaction = false
-local BlizzPlates = true
-local KhalPlatesCheck = false
-local TidyPlatesCheck = false
-local ElvUICheck = false
-local ElvUIdynamicAnchor = true -- Forces the icon to follow ElvUI's HealthBar (it moves or hides with it). Set to false for a static "always show" state.
-local KuiNameplatesCheck = false
-local AloftCheck = false
+local CustomPlateCheck = false
+local lastCLEUtime = nil
+local CLEUtimeout = nil
+local CLEUcheck = false
+local testMode = false
 local debugMode = false
+local L = BGH.Locale
 
-local BGStatus = {
-	[1] = true,
-	[2] = true,
-	[3] = true
-}
-
-BGH.AllianceCount = 0
-BGH.HordeCount = 0
+BGH_Public.AllianceCount = 0
+BGH_Public.HordeCount = 0
 BGH_Notifier = BGH_Notifier or {}
 BGH_Notifier.OnHealerDetected = nil
 
@@ -99,66 +89,75 @@ local IconTextures = {
     }
 }
 
-local HealerClasses = {"PALADIN", "SHAMAN", "DRUID", "PRIEST"}
-local HCN = {}
-for _, className in ipairs(HealerClasses) do
-    HCN[LOCALIZED_CLASS_NAMES_MALE[className]] = className
-    HCN[LOCALIZED_CLASS_NAMES_FEMALE[className]] = className
-end
-
 local HealerSpells = {
-    --------------------------------PALADIN--------------------------------
-    20473, 20929, 20930, 27174, 33072, 48824, 48825,  -- Holy Shock	
-    53563,  -- Beacon of Light
-    31842,  -- Divine Illumination
-    20216,  -- Divine Favor
-    31834,  -- Light's Grace
-    53655, 53656, 53657, 54152, 54153,  -- Judgements of the Pure
-    53672, 54149,  -- Infusion of Light
-    53659,  -- Sacred Cleansing
-    --------------------------------SHAMAN---------------------------------
-    49284, 49283, 32594, 32593, 974,  -- Earth Shield	
-    61301, 61300, 61299, 61295,  -- Riptide
-    51886,  -- Cleanse Spirit
-    16190,  -- Mana Tide Totem
-    16188,  -- Nature's Swiftness
-    55198,  -- Tidal Force
-    53390,  -- Tidal Waves
-    31616,  -- Nature's Guardian
-    16177, 16236, 16237, -- Ancestral Fortitude
-    ---------------------------------DRUID---------------------------------
-    53251, 53249, 53248, 48438,  -- Wild Growth
-    33891,  -- Tree of Life
-    18562,  -- Swiftmend
-    17116,  -- Nature's Swiftness
-    48504,  -- Living Seed
-    45283, 45282, 45281,  -- Natural Perfection		
-    --------------------------------DPRIEST--------------------------------
-    47750, 52983, 52984, 52985,  -- Penance
-    10060,  -- Power Infusion
-    33206,  -- Pain Suppression
-    47930,  -- Grace
-    59891, 59890, 59889, 59888, 59887,  -- Borrowed Time
-    45242, 45241, 45237,  -- Focused Will		
-    47753,  -- Divine Aegis
-    63944,  -- Renewed Hope	
-    --------------------------------HPRIEST--------------------------------	
-    48089, 48088, 34866, 34865, 34864, 34863, 34861,  -- Circle of Healing		
-    47788,	-- Guardian Spirit	
-    48085, 48084, 28276, 27874, 27873, 7001,  -- Lightwell Renew                
-    33151,  -- Surge of light	
-    65081, 64128,  -- Body and Soul
-    33143,  -- Blessed Resilience         
-    63725, 63724, 34754,  -- Holy Concentration
-    63734, 63735, 63731,  -- Serendipity
-    27827,  -- Spirit of Redemption                
+    PALADIN = {
+        20473, 20929, 20930, 27174, 33072, 48824, 48825,  -- Holy Shock	
+        53563,                                            -- Beacon of Light
+        31842,                                            -- Divine Illumination
+        20216,                                            -- Divine Favor
+        31834,                                            -- Light's Grace
+        53655, 53656, 53657, 54152, 54153,                -- Judgements of the Pure
+        53672, 54149,                                     -- Infusion of Light
+        53659,                                            -- Sacred Cleansing
+    },
+    SHAMAN = {
+        49284, 49283, 32594, 32593, 974,                  -- Earth Shield	
+        61301, 61300, 61299, 61295,                       -- Riptide
+        51886,                                            -- Cleanse Spirit
+        16190,                                            -- Mana Tide Totem
+        16188,                                            -- Nature's Swiftness
+        55198,                                            -- Tidal Force
+        53390,                                            -- Tidal Waves
+        31616,                                            -- Nature's Guardian
+        16177, 16236, 16237,                              -- Ancestral Fortitude
+    },
+    DRUID = {
+        53251, 53249, 53248, 48438,                       -- Wild Growth
+        33891,                                            -- Tree of Life
+        18562,                                            -- Swiftmend
+        17116,                                            -- Nature's Swiftness
+        48504,                                            -- Living Seed
+        45283, 45282, 45281,                              -- Natural Perfection		
+    },
+    PRIEST = {
+        -- DISC
+        47750, 52983, 52984, 52985,                       -- Penance
+        10060,                                            -- Power Infusion
+        33206,                                            -- Pain Suppression
+        47930,                                            -- Grace
+        59891, 59890, 59889, 59888, 59887,                -- Borrowed Time
+        45242, 45241, 45237,                              -- Focused Will		
+        47753,                                            -- Divine Aegis
+        63944,                                            -- Renewed Hope	
+        -- HOLY	
+        48089, 48088, 34866, 34865, 34864, 34863, 34861,  -- Circle of Healing		
+        47788,                                            -- Guardian Spirit	
+        48085, 48084, 28276, 27874, 27873, 7001,          -- Lightwell Renew                
+        33151,                                            -- Surge of light	
+        65081, 64128,                                     -- Body and Soul
+        33143,                                            -- Blessed Resilience         
+        63725, 63724, 34754,                              -- Holy Concentration
+        63734, 63735, 63731,                              -- Serendipity
+        27827,                                            -- Spirit of Redemption    
+    },
 }
-local healerSpellHash = {}
-for _, spellID in ipairs(HealerSpells) do
-    healerSpellHash[spellID] = true
+
+--------- Maps localized healer class names to class tokens ---------
+local HealerClassTokens = {}
+for class in pairs(HealerSpells) do
+    HealerClassTokens[LOCALIZED_CLASS_NAMES_MALE[class]] = class
+    HealerClassTokens[LOCALIZED_CLASS_NAMES_FEMALE[class]] = class
 end
 
-local playerName = UnitName("player")
+--------- Maps healer spell IDs to their associated class ---------
+local HealerSpellMap = {}
+for class, spells in pairs(HealerSpells) do
+    for _, spellID in ipairs(spells) do
+        HealerSpellMap[spellID] = class
+    end
+end
+
+--------- Lazily caches player spell resource usage information ---------
 local playerSpells = setmetatable({}, {
 	__index = function(tbl, name)
 		local _, _, _, cost, _, powerType = GetSpellInfo(name)
@@ -167,6 +166,13 @@ local playerSpells = setmetatable({}, {
 	end
 })
 
+--------- Tracks the state of each BG queue slot ---------
+local BGstatus = {}
+for i = 1, MAX_BATTLEFIELD_QUEUES do
+	BGstatus[i] = true
+end
+
+--------- Default icon anchor positions and offsets ---------
 local anchorMapping = {
     ["left"] = {
         anchorPoint = "RIGHT", relativePoint = "LEFT",
@@ -178,11 +184,15 @@ local anchorMapping = {
     },
     ["right"] = {
         anchorPoint = "LEFT", relativePoint = "RIGHT",
-        xOffset = -28, yOffset = -9
+        xOffset = -5, yOffset = -9
     },
 }
 
+--------- Initializes and validates addon settings ---------
 local function InitSettings()
+    if not BGHchar then
+        BGHchar = {}
+    end
     if not BGHsettings then
         BGHsettings = {}
     end
@@ -198,123 +208,225 @@ local function InitSettings()
     end
 end
 
+--------- Prints a formatted message with the BGH prefix ---------
 local function BGHprint(...)
 	print("|cff00FF98[BGH]|r", ...)
 end
 
-local function HandleLevelTextOverlap(BGHframe)
-    local texture = MarkedNames[BGHframe.activeName]
-    local levelRegion = BGHframe.levelRegion
-    if texture then
-        if BGHsettings.iconAnchor == "right" then
-            local x = BGHsettings.iconXoffset
-            local y = BGHsettings.iconYoffset
-            local D = BGHsettings.iconSize
-            if BGHsettings.iconStyle == "Blizzlike" then
-                local r = 0.5 * D
-                local R = math_sqrt(((x + r - 12)/0.8)^2 + (y/0.5)^2)
-                local d = math_abs(1 - 1/R)*math_sqrt((x + r - 12)^2+(y)^2)
-                if d < r or R < 1 then
-                    levelRegion:Hide()
-                else
-                    levelRegion:Show()
-                end
-            elseif BGHsettings.iconStyle == "Minimalist" then
-                local inOverlapDomain = (
-                    x < -0.2 * D + 14 and 
-                    x > -0.8 * D + 14 and 
-                    y < 0.325 * D - 0.5 and 
-                    y > -0.325 * D + 0.5
-                )
-                local OverlapAdjustment = not (
-                    x >= 0 and x <= 8 and
-                    math_abs(y) >= 8 and math_abs(y) <= 18 and
-                    D >= 3 * math_abs(y) + 3 and
-                    D <= 69 - 5 * x
-                )
-                if inOverlapDomain and OverlapAdjustment then
-                    levelRegion:Hide()
-                else
-                    levelRegion:Show()
-                end
-            else
-                levelRegion:Show()
-            end
+--------- Determines the unit reaction type from the health bar color ---------
+local function ReactionByColor(healthBar)
+    local r, g, b = healthBar:GetStatusBarColor()
+	if g > .99 and b < .01 then -- Ignored reaction color
+		return
+    elseif g < .01 then
+        if b < .01 then
+		    return 1 -- Hostile (red)
         else
-            levelRegion:Show()
+            return 2 -- Friendly Player (blue)
         end
     else
-        levelRegion:Show()
-    end
+	    return 3 -- Hostile Player (class color)
+	end
 end
 
-------------- Update the icon texture if it changes  -------------
-local function UpdateTextures(BGHframe)
-    local texture = MarkedNames[BGHframe.activeName]
+--------- Updates the BGH icon anchor position ---------
+local function UpdateIconAnchor(BGHframe)
+    BGHframe.icon:ClearAllPoints()
+    local anchorData = anchorMapping[BGHsettings.iconAnchor or "top"]
+    BGHframe.icon:SetPoint(
+        anchorData.anchorPoint,
+        BGHframe.parentPlate,
+        anchorData.relativePoint,
+        BGHsettings.iconXoffset + anchorData.xOffset,
+        BGHsettings.iconYoffset + anchorData.yOffset
+    )
+end
+
+--------- Updates the BGH icon size ---------
+local function UpdateIconSize(BGHframe)
+    BGHframe.icon:SetSize(BGHsettings.iconSize, BGHsettings.iconSize)
+end
+
+--------- Updates the BGH icon texture and visibility ---------
+local function UpdateIconTexture(BGHframe)
+    if not BGHframe then return end
+    local name = BGHframe.activeName
+    local texture
+    if MarkedNames[name] == "FRIEND" and (FriendlyPlates[name] == BGHframe or testMode) then
+        texture = BGHsettings.iconInvertColor == 1 and IconTextures[BGHsettings.iconStyle].Red or IconTextures[BGHsettings.iconStyle].Blue
+    elseif MarkedNames[name] == "ENEMY" and (EnemyPlates[name] == BGHframe or testMode) then
+        texture = BGHsettings.iconInvertColor == 1 and IconTextures[BGHsettings.iconStyle].Blue or IconTextures[BGHsettings.iconStyle].Red
+    end
     if texture then
-        if texture ~= BGHframe.prevTexture then
-            BGHframe.icon:SetTexture(texture)
-            BGHframe.icon:Show()
-            BGHframe.prevTexture = texture
-        end
+        BGHframe.icon:SetTexture(texture)
+        BGHframe.icon:Show()
     else
+        BGHframe.icon:SetTexture(nil)
         BGHframe.icon:Hide()
-        BGHframe.prevTexture = nil   
-    end
-    -- Hide Blizz default plate's level text if it overlaps with the icon
-    if BlizzPlates then  
-        HandleLevelTextOverlap(BGHframe)
     end
 end
 
------------- Update all mark frames when the configuration changes  ------------
-local function UpdateAllMarks()
-    for plate, BGHframe in pairs(GlobalNamePlates) do
-        if BGHframe.icon then
-            BGHframe.icon:ClearAllPoints()
-            local anchorData = anchorMapping[BGHsettings.iconAnchor or "top"]
-            BGHframe.icon:SetPoint(
-                anchorData.anchorPoint,
-                plate,
-                anchorData.relativePoint,
-                BGHsettings.iconXoffset + anchorData.xOffset,
-                BGHsettings.iconYoffset + anchorData.yOffset
-            )
-            BGHframe.icon:SetSize(BGHsettings.iconSize, BGHsettings.iconSize)
-            UpdateTextures(BGHframe)
-        end
-    end
+--------- Assigns a healer mark to a nameplate ---------
+local function SetBGHmark(name, reaction)
+    MarkedNames[name] = reaction
+    UpdateIconTexture(FriendlyPlates[name])
+    UpdateIconTexture(EnemyPlates[name])
 end
 
+--------- OnShow script handler for BGH frames ---------
 local function BGHonShow(BGHframe)
+    local reaction = ReactionByColor(BGHframe.healthBar)
     local name = BGHframe.nameRegion:GetText()
     BGHframe.activeName = name
-    ActiveNamePlates[name] = BGHframe
-    if MarkedNames[name] then
-        UpdateTextures(BGHframe)
+    if reaction == 3 or (reaction == 1 and GetCVar("ShowClassColorInNameplate") == "0") then
+        EnemyPlates[name] = BGHframe
+    elseif reaction == 2 then
+        FriendlyPlates[name] = BGHframe
+    end
+    UpdateIconTexture(BGHframe)
+end
+
+--------- OnHide script handler for BGH frames ---------
+local function BGHonHide(BGHframe)
+    local name = BGHframe.activeName
+    FriendlyPlates[name] = nil
+    EnemyPlates[name] = nil
+    BGHframe.activeName = nil
+    BGHframe.icon:Hide()
+end
+
+--------- Anchor offsets for supported custom nameplates ---------
+local CustomPlatesOffsets = {
+    -- left, top, right
+    {"RealPlate", {
+        {17.5, 13}, {0, 1}, {-16, 13},
+    }},
+    {"extended", {
+        {3, 0}, {0, -5}, {-3, 0},
+    }},
+    {"UnitFrame", {
+        {2, 1}, {0, 12}, {-2, 1},
+    }},
+    {"kui", {
+        {38, 0}, {0, -10}, {-39, 0},
+    }},
+    {"npHooked", {
+        {1, 0}, {0, 3}, {-1, 0},
+    }},
+    {"aloftData", {
+        {4, 0}, {0, -1}, {-5, 0},
+    }},
+    {"done", {
+        {5, 0}, {0, 2}, {-5, 0},
+    }},
+    {"myPlate", {
+        {14, -2}, {0, 0}, {-14, -2},
+    }},
+}
+
+--------- Updates the icon anchor mapping for the detected custom nameplate ---------
+local function UpdateAnchorMapping(nameplate)
+    for _, plate in ipairs(CustomPlatesOffsets) do
+        if nameplate[plate[1]] then
+            CustomPlateCheck = true
+            local offset = plate[2]
+            anchorMapping = {
+                left = {
+                    anchorPoint = "RIGHT",
+                    relativePoint = "LEFT",
+                    xOffset = offset[1][1],
+                    yOffset = offset[1][2],
+                },
+                top = {
+                    anchorPoint = "BOTTOM",
+                    relativePoint = "TOP",
+                    xOffset = offset[2][1],
+                    yOffset = offset[2][2],
+                },
+                right = {
+                    anchorPoint = "LEFT",
+                    relativePoint = "RIGHT",
+                    xOffset = offset[3][1],
+                    yOffset = offset[3][2],
+                },
+            }
+            return
+        end
     end
 end
 
-local function BGHonHide(BGHframe)
-    BGHframe.icon:Hide()
-    ActiveNamePlates[BGHframe.activeName], BGHframe.activeName, BGHframe.prevTexture = nil
+---- Checks and replaces the nameplate anchor if custom ----
+local function GetPlateElements(nameplate)
+    local nameRegion = select(7, nameplate:GetRegions())
+    local healthBar = nameplate:GetChildren()
+    if nameplate.extended then
+        nameplate = nameplate.extended
+    elseif nameplate.UnitFrame then
+        nameplate = nameplate.UnitFrame.Health or nameplate.UnitFrame
+    elseif nameplate.kui then
+        nameRegion = nameplate.kui.oldName
+        healthBar = nameplate.kui.oldHealth
+    elseif nameplate.npHooked then
+        nameplate = nameplate.healthBar
+    end
+    return nameplate, nameRegion, healthBar
 end
 
-local function BGHonUpdate(BGHframe)
-    if BGHframe.nameRegion:GetText() ~= BGHframe.activeName then
-        BGHonHide(BGHframe)
-        BGHonShow(BGHframe)
-        BGHframe.activeName = BGHframe.nameRegion:GetText()
+--------- Allows external addons to override a BGH icon's size and anchor ---------
+local function ModifyIcon(self, shouldModify, newParent, iconSize, anchorPoint, relativeFrame, relativePoint, xOffset, yOffset)
+    if shouldModify then
+        self.icon:ClearAllPoints()
+        self.icon:SetPoint(
+            anchorPoint,
+            relativeFrame,
+            relativePoint,
+            xOffset,
+            yOffset
+        )
+        self.icon:SetSize(iconSize, iconSize)
+        self:SetParent(newParent)
+    else
+        UpdateIconAnchor(self)
+        UpdateIconSize(self)
+        self:SetParent(self.parentPlate)
+    end
+end
+
+-------- Setup a frame that manages the healer mark parameters  --------
+local function SetupBGHframe(nameplate)
+    if not CustomPlateCheck then
+        UpdateAnchorMapping(nameplate)
+    end
+    local plate, nameRegion, healthBar = GetPlateElements(nameplate)
+    local BGHframe = CreateFrame("Frame", nil, plate)
+    AllNamePlates[plate] = BGHframe 
+    plate.BGHframe = BGHframe
+    BGHframe.parentPlate = plate
+    BGHframe.nameRegion = nameRegion
+    BGHframe.healthBar = healthBar
+    BGHframe.icon = BGHframe:CreateTexture(nil, "OVERLAY")
+    UpdateIconAnchor(BGHframe)
+    UpdateIconSize(BGHframe)
+    BGHonShow(BGHframe)
+    BGHframe:SetScript("OnShow", BGHonShow)
+    BGHframe:SetScript("OnHide", BGHonHide)
+    BGHframe.ModifyIcon = ModifyIcon
+    if plate.shouldModifyBGH then
+        BGHframe:ModifyIcon(unpack(plate.shouldModifyBGH))
+        plate.shouldModifyBGH = nil
     end
 end
 
 ---- Checks if the frame is a nameplate ----
 local function IsNamePlate(frame)
-    if frame.RealPlate  -- KhalPlates
+    if frame.RealPlate  -- RefinedBlizzPlates
     or frame.extended   -- TidyPlates
     or frame.UnitFrame  -- ElvUI
+    or frame.npHooked   -- NotPlater
     or frame.kui        -- KuiNameplates
     or frame.aloftData  -- Aloft
+    or frame.done       -- sNamePlates
+    or frame.myPlate    -- PrettyNameplates
     then
         return true
     end
@@ -322,174 +434,7 @@ local function IsNamePlate(frame)
     return r2 and r2:GetObjectType() == "Texture" and r2:GetTexture() == "Interface\\Tooltips\\Nameplate-Border"
 end
 
----- Checks and replaces the nameplate anchor if custom ----
-local function CheckCustomPlate(nameplate)
-    local nameRegion, levelRegion = select(7, nameplate:GetRegions())
-    if nameplate.RealPlate then -- KhalPlates
-        if not KhalPlatesCheck then
-            KhalPlatesCheck = true
-            BlizzPlates = false
-            anchorMapping = {
-                ["left"] = {
-                    anchorPoint = "RIGHT", relativePoint = "LEFT",
-                    xOffset = 17.5, yOffset = 13
-                },
-                ["top"] = {
-                    anchorPoint = "BOTTOM", relativePoint = "TOP",
-                    xOffset = 0, yOffset = 1
-                },
-                ["right"] = {
-                    anchorPoint = "LEFT", relativePoint = "RIGHT",
-                    xOffset = -16, yOffset = 13
-                },
-            }
-        end
-    elseif nameplate.extended then -- TidyPlates
-        nameplate = nameplate.extended
-        if not TidyPlatesCheck then
-            TidyPlatesCheck = true
-            BlizzPlates = false
-            anchorMapping = {
-                ["left"] = {
-                    anchorPoint = "RIGHT", relativePoint = "LEFT",
-                    xOffset = 3, yOffset = 0
-                },
-                ["top"] = {
-                    anchorPoint = "BOTTOM", relativePoint = "TOP",
-                    xOffset = 0, yOffset = -5
-                },
-                ["right"] = {
-                    anchorPoint = "LEFT", relativePoint = "RIGHT",
-                    xOffset = -3, yOffset = 0
-                },
-            }
-        end
-    elseif nameplate.UnitFrame then -- ElvUI
-        if ElvUIdynamicAnchor and nameplate.UnitFrame.Health then
-            nameplate = nameplate.UnitFrame.Health
-        else
-            nameplate = nameplate.UnitFrame
-        end
-        if not ElvUICheck then
-            ElvUICheck = true
-            BlizzPlates = false
-            anchorMapping = {
-                ["left"] = {
-                    anchorPoint = "RIGHT", relativePoint = "LEFT",
-                    xOffset = 2, yOffset = 1
-                },
-                ["top"] = {
-                    anchorPoint = "BOTTOM", relativePoint = "TOP",
-                    xOffset = 0, yOffset = 12
-                },
-                ["right"] = {
-                    anchorPoint = "LEFT", relativePoint = "RIGHT",
-                    xOffset = -2, yOffset = 1
-                },
-            }
-        end
-    elseif nameplate.kui then -- KuiNameplates
-        nameRegion, levelRegion = nameplate.kui.oldName, nameplate.kui.level
-        if not KuiNameplatesCheck then
-            KuiNameplatesCheck = true
-            BlizzPlates = false
-            anchorMapping = {
-                ["left"] = {
-                    anchorPoint = "RIGHT", relativePoint = "LEFT",
-                    xOffset = 38, yOffset = 0
-                },
-                ["top"] = {
-                    anchorPoint = "BOTTOM", relativePoint = "TOP",
-                    xOffset = 0, yOffset = -10
-                },
-                ["right"] = {
-                    anchorPoint = "LEFT", relativePoint = "RIGHT",
-                    xOffset = -39, yOffset = 0
-                },
-            }
-        end
-    elseif nameplate.aloftData then -- Aloft
-        if not AloftCheck then
-            AloftCheck = true
-            BlizzPlates = false
-            anchorMapping = {
-                ["left"] = {
-                    anchorPoint = "RIGHT", relativePoint = "LEFT",
-                    xOffset = 4, yOffset = 0
-                },
-                ["top"] = {
-                    anchorPoint = "BOTTOM", relativePoint = "TOP",
-                    xOffset = 0, yOffset = -1
-                },
-                ["right"] = {
-                    anchorPoint = "LEFT", relativePoint = "RIGHT",
-                    xOffset = -5, yOffset = 0
-                },
-            }
-        end
-    end
-    return nameplate, nameRegion, levelRegion
-end
-
--------- Setup a frame that manages the mark texture parameters  --------
-local function SetupNamePlate(nameplate)
-    local plate, nameRegion, levelRegion = CheckCustomPlate(nameplate)
-    local BGHframe = CreateFrame("Frame", nil, plate)
-    plate.BGHframe = BGHframe
-    BGHframe.parentPlate = plate
-    GlobalNamePlates[plate] = BGHframe
-    BGHframe.icon = BGHframe:CreateTexture(nil, "OVERLAY")
-    BGHframe.icon:ClearAllPoints()
-    local anchorData = anchorMapping[BGHsettings.iconAnchor or "top"]
-    BGHframe.icon:SetPoint(
-        anchorData.anchorPoint,
-        plate,
-        anchorData.relativePoint,
-        BGHsettings.iconXoffset + anchorData.xOffset,
-        BGHsettings.iconYoffset + anchorData.yOffset
-    )
-    BGHframe.icon:SetSize(BGHsettings.iconSize, BGHsettings.iconSize)
-    BGHframe.nameRegion = nameRegion
-    BGHframe.activeName = nameRegion:GetText()
-    ActiveNamePlates[BGHframe.activeName] = plate
-    BGHframe.levelRegion = levelRegion
-    BGHframe.levelRegion:SetDrawLayer("ARTWORK")
-    BGHonShow(BGHframe)
-    UpdateTextures(BGHframe)
-    BGHframe:SetScript("OnUpdate", BGHonUpdate)
-    BGHframe:SetScript("OnShow", BGHonShow)
-    BGHframe:SetScript("OnHide", BGHonHide)
-    function BGHframe:ModifyIcon(shouldModify, newParent, iconSize, anchorPoint, relativeFrame, relativePoint, xOffset, yOffset)
-        self.icon:ClearAllPoints()
-        if shouldModify then
-            self.icon:SetPoint(
-                anchorPoint,
-                relativeFrame,
-                relativePoint,
-                xOffset,
-                yOffset
-            )
-            self.icon:SetSize(iconSize, iconSize)
-            self:SetParent(newParent)
-        else
-            self.icon:SetPoint(
-                anchorData.anchorPoint,
-                plate,
-                anchorData.relativePoint,
-                BGHsettings.iconXoffset + anchorData.xOffset,
-                BGHsettings.iconYoffset + anchorData.yOffset
-            )
-            self.icon:SetSize(BGHsettings.iconSize, BGHsettings.iconSize)
-            self:SetParent(plate)
-        end
-    end
-    if plate.shouldModifyBGH then
-        BGHframe:ModifyIcon(unpack(plate.shouldModifyBGH))
-        plate.shouldModifyBGH = nil
-    end
-end
-
------- Detects when the number of nameplates in the WorldFrame increases  ------
+------ Detects newly created nameplate frames and sets up BGH frames ------
 local ChildCount, NewChildCount = 0
 CreateFrame("Frame"):SetScript("OnUpdate", function()
     NewChildCount = WorldFrame:GetNumChildren()
@@ -498,9 +443,10 @@ CreateFrame("Frame"):SetScript("OnUpdate", function()
             local child = select(i, WorldFrame:GetChildren())
             -- 1 frame delay to ensure custom nameplate is available --
             CreateFrame("Frame"):SetScript("OnUpdate", function(self)
+                self:SetScript("OnUpdate", nil)
                 self:Hide()
                 if IsNamePlate(child) then
-                    SetupNamePlate(child)
+                    SetupBGHframe(child)
                 end
             end)
         end
@@ -508,68 +454,57 @@ CreateFrame("Frame"):SetScript("OnUpdate", function()
     end
 end)
 
---------- Assigns a healer mark to a nameplate ---------
-local function SetBGHmark(name, texture)
-    if texture == "blue" then
-        MarkedNames[name] = IconTextures.Blizzlike.Blue
-    elseif texture == "red" then
-        MarkedNames[name] = IconTextures.Blizzlike.Red
-    elseif texture == "miniblue" then
-        MarkedNames[name] = IconTextures.Minimalist.Blue
-    elseif texture == "minired" then
-        MarkedNames[name] = IconTextures.Minimalist.Red
-    else
-        MarkedNames[name] = texture
+--------- Converts RGB color values to a hexadecimal code ---------
+local function RGBtoHEX(r, g, b)
+    return string_format("|cff%02x%02x%02x", r * 255, g * 255, b * 255)
+end
+
+--------- Returns the hexadecimal color code associated with a faction ---------
+local function GetFactionColorHEX(faction)
+    if faction ~= 0 and faction ~= 1 then
+        return "|cffffffff"
     end
-    if ActiveNamePlates[name] then
-        UpdateTextures(ActiveNamePlates[name])
+    local info = ChatTypeInfo[faction == 0 and "BG_SYSTEM_HORDE" or "BG_SYSTEM_ALLIANCE"]
+    return string_format("|cff%02x%02x%02x", info.r * 255, info.g * 255, info.b * 255)
+end
+
+--------- Removes healers who are no longer present in the Battleground player list ---------
+local function ClearDeserterHealers(list)
+    for name, healerData in pairs(list) do
+        if not CurrentBGplayers[name] then
+            if BGHsettings.showMessages == 1 or debugMode then
+                if healerData then
+                    local color = RAID_CLASS_COLORS[healerData.class]
+                    local coloredName = color and RGBtoHEX(color.r, color.g, color.b) .. name .. "|r" or name
+                    BGHprint(string_format("%s %s" .. L["has left the battleground."] .. "|r", coloredName, GetFactionColorHEX(healerData.faction)))
+                else
+                    BGHprint(string_format("%s " .. L["has left the battleground."], name))
+                end
+            end
+            SetBGHmark(name, nil)
+            list[name] = nil
+        end
     end
 end
 
+----- Clears all healers from the specified tracking list -----
 local function ClearHealers(list)
     for name in pairs(list) do
         SetBGHmark(name, nil)
+        list[name] = nil
     end
-    wipe(list)
-end
-
-local function RGBToHex(r, g, b)
-    return string_format("|cff%02x%02x%02x", r * 255, g * 255, b * 255)
 end
 
 ----------- Updates BG players list -----------
 local function UpdateCurrentBGplayers()
-    currentBGplayers = {}
+    if not (inBG and playerFaction) then return end
+    CurrentBGplayers = {}
+    local name, class, _
     for i = 1, GetNumBattlefieldScores() do
-        local name, _, _, _, _, faction = GetBattlefieldScore(i)
+        name, _, _, _, _, _, _, _, class = GetBattlefieldScore(i)
         if name then
             name = name:match("([^%-]+).*")
-            currentBGplayers[name] = true
-            if not playerFaction and name == playerName then
-                playerFaction = faction
-                if debugMode then
-                    BGHprint("Debug: Player Faction: ", playerFaction == 1 and "Alliance" or "Horde")
-                end
-            end
-        end
-    end
-    local function ClearDeserterHealers(healersList)
-        for name, data in pairs(healersList) do
-            if not currentBGplayers[name] then
-                if BGHsettings.showMessages == 1 or debugMode then
-                    if data then
-                        local class = data.class
-                        local color = class and RAID_CLASS_COLORS[class]
-                        local coloredName = color and RGBToHex(color.r, color.g, color.b) .. name .. "|r" or name
-                        local factionText = data.faction == 1 and HEX_COLOR_ALLIANCE .. "(" .. L["Alliance"] .. ")|r" or HEX_COLOR_HORDE .. "(" .. L["Horde"] .. ")|r"
-                        BGHprint(string_format(L["%s %s has left the BG, removed from healers list."], coloredName, factionText))
-                    else
-                        BGHprint(string_format(L["%s has left the BG, removed from healers list."], name))
-                    end
-                end
-                healersList[name] = nil
-                SetBGHmark(name, nil)
-            end
+            CurrentBGplayers[name] = class
         end
     end
     ClearDeserterHealers(WSSFhealers)
@@ -578,35 +513,68 @@ end
 
 ---------- Updates the list of healers based on the BG Scoreboard (WorldStateScoreFrame), prioritizing the Combat Log healers list if active ----------
 local function UpdateWSSFhealers()
-    if BGHsettings.WSSFtracking == 1 then
-        local name, faction, class, damageDone, healingDone, _
-        for i = 1, GetNumBattlefieldScores() do
-            name, _, _, _, _, faction, _, _, class, _, damageDone, healingDone = GetBattlefieldScore(i)
-            if name then
-                name = name:match("([^%-]+).*")
-                if healingDone > BGHsettings.h2dRatio * damageDone and healingDone > BGHsettings.healingThreshold and HCN[class] then
-                    if not WSSFhealers[name] and not CLEUhealers[name] and playerFaction then
-                        WSSFhealers[name] = {class = HCN[class], faction = faction}
-                        SetBGHmark(name, ((BGHsettings.iconInvertColor == 1) == (faction == playerFaction)) and IconTextures[BGHsettings.iconStyle].Red or IconTextures[BGHsettings.iconStyle].Blue)
-                        if debugMode then
-                            BGHprint(string_format("Debug: %s (%s) added to BG Scoreboard healers list.", name, faction == 1 and "Alliance" or "Horde"))
-                        end 
+    if not (inBG and playerFaction and BGHsettings.WSSFtracking == 1) then return end
+    local name, faction, localizedClass, damageDone, healingDone, reaction, healerClass, _
+    for i = 1, GetNumBattlefieldScores() do
+        name, _, _, _, _, faction, _, _, localizedClass, _, damageDone, healingDone = GetBattlefieldScore(i)
+        if name then
+            name = name:match("([^%-]+).*")
+            healerClass = HealerClassTokens[localizedClass]
+            if healerClass and healingDone > BGHsettings.h2dRatio * damageDone and healingDone > BGHsettings.healingThreshold then      
+                if not WSSFhealers[name] and not CLEUhealers[name] then
+                    if FriendlyHealerCandidates[name] == healerClass then
+                        reaction = "FRIEND"
+                        faction = playerFaction
+                    else
+                        reaction = "ENEMY"
+                        faction = math_abs(playerFaction - 1)
                     end
-                elseif WSSFhealers[name] then
-                    WSSFhealers[name] = nil
-                    SetBGHmark(name, nil)
+                    SetBGHmark(name, reaction)
+                    WSSFhealers[name] = {class = healerClass, faction = faction}
                     if debugMode then
-                        BGHprint(string_format("Debug: %s (%s) removed from BG Scoreboard healers list (below healing-to-damage ratio).", name, faction == 1 and "Alliance" or "Horde"))
+                        BGHprint(string_format("Debug: %s (%s) added to BG Scoreboard healers list.", name, faction == 1 and "Alliance" or "Horde"))
                     end 
                 end
+            elseif WSSFhealers[name] then
+                SetBGHmark(name, nil)
+                WSSFhealers[name] = nil
+                if debugMode then
+                    BGHprint(string_format("Debug: %s (%s) removed from BG Scoreboard healers list (below healing-to-damage ratio).", name, faction == 1 and "Alliance" or "Horde"))
+                end 
             end
         end
     end
 end
 
+--------- Updates the public healer count by faction from detected healers ---------
+local function UpdatePublicHealerCount()
+    if inBG and playerFaction then
+        local hordeCount, allianceCount = 0, 0
+        for _, healerData in pairs(CLEUhealers) do
+            if healerData.faction == 0 then
+                hordeCount = hordeCount + 1
+            elseif healerData.faction == 1 then
+                allianceCount = allianceCount + 1
+            end
+        end
+        for _, healerData in pairs(WSSFhealers) do
+            if healerData.faction == 0 then
+                hordeCount = hordeCount + 1
+            elseif healerData.faction == 1 then
+                allianceCount = allianceCount + 1
+            end
+        end
+        BGH_Public.AllianceCount = allianceCount
+        BGH_Public.HordeCount = hordeCount
+    else
+        BGH_Public.AllianceCount = 0
+        BGH_Public.HordeCount = 0
+    end
+end
+
 ----------- Manages Combat Log tracking, considering a player can change specs during the Preparation phase -----------
 local function UpdateCLEUstate()
-    if BGHsettings.CLEUtracking == 1 then
+    if inBG and BGHsettings.CLEUtracking == 1 then
         local inPreparation = false
         for i = 1, 40 do
             if select(11, UnitAura("player", i)) == 44521 then
@@ -616,14 +584,14 @@ local function UpdateCLEUstate()
         end
         if inPreparation then
             if USSregistered and BGHsettings.CLEUfix == 1 then
-                CLEUframe:UnregisterEvent("UNIT_SPELLCAST_SUCCEEDED")
+                EventHandler:UnregisterEvent("UNIT_SPELLCAST_SUCCEEDED")
                 USSregistered = false
                 if debugMode then
                     BGHprint("Debug: Automatic Combat Log fix disabled until Preparation phase is over.")
                 end
             end
             if CLEUregistered then
-                CLEUframe:UnregisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
+                EventHandler:UnregisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
                 CLEUregistered = false
                 ClearHealers(CLEUhealers)
                 if debugMode then
@@ -632,106 +600,52 @@ local function UpdateCLEUstate()
             end
         else
             if not CLEUregistered then
-                CLEUframe:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")    
+                EventHandler:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")    
                 CLEUregistered = true        
                 if debugMode then
                     BGHprint("Debug: Combat Log tracking enabled.")
                 end 
             end
             if not USSregistered and BGHsettings.CLEUfix == 1 then
-                CLEUframe:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
+                EventHandler:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
                 USSregistered = true
                 if debugMode then
                     BGHprint("Debug: Automatic Combat Log fix enabled.")
                 end 
             end
         end
+    else
+        EventHandler:UnregisterEvent("UNIT_SPELLCAST_SUCCEEDED")
+        USSregistered = false
+        EventHandler:UnregisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
+        CLEUregistered = false    
     end
 end
 
-local lastCLEUtime = nil
-local CLEUtimeout = nil
-local CLEUcheck = false
-------------------- Updates the list of healers based on Combat Log Events -------------------
-local function CLEUhandler(self, event, ...)
-    if event == "COMBAT_LOG_EVENT_UNFILTERED" then
-        lastCLEUtime = GetTime()
-        local _, subEvent, _, sourceName, _, _, _, _, spellID = ...
-        if subEvent == "SPELL_CAST_SUCCESS" or subEvent == "SPELL_AURA_APPLIED" then
-            if healerSpellHash[spellID] then
-                local shortName = sourceName:match("([^%-]+).*")
-                if not CLEUhealers[shortName] then
-                    if WorldStateScoreFrame:IsShown() and WorldStateScoreFrame.selectedTab and WorldStateScoreFrame.selectedTab > 1 then return end
-                    SetBattlefieldScoreFaction()
-                    RequestBattlefieldScoreData()
-                    for i = 1, GetNumBattlefieldScores() do
-                        local name, _, _, _, _, faction, _, _, class = GetBattlefieldScore(i)
-                        if name then
-                            name = name:match("([^%-]+).*")
-                            if name == shortName and HCN[class] and playerFaction then
-                                CLEUhealers[name] = {class = HCN[class], faction = faction}
-                                SetBGHmark(name, ((BGHsettings.iconInvertColor == 1) == (faction == playerFaction)) and IconTextures[BGHsettings.iconStyle].Red or IconTextures[BGHsettings.iconStyle].Blue)
-                                if BGH_Notifier.OnHealerDetected and faction ~= playerFaction then
-                                    pcall(BGH_Notifier.OnHealerDetected, sourceName, HCN[class])
-                                end
-                                if debugMode then
-                                    BGHprint(string_format("Debug: %s (%s) added to Combat Log healers list (spellID: %s)", name, faction == 1 and "Alliance" or "Horde", spellID))
-                                end 
-                                if WSSFhealers[name] then
-                                    WSSFhealers[name] = nil
-                                    if debugMode then
-                                        BGHprint(string_format("Debug: %s (%s) removed from BG Scoreboard healers list (Combat Log list priority).", name, faction == 1 and "Alliance" or "Horde"))
-                                    end
-                                end
-                                break
-                            end
-                        end
-                    end
-                end
-            end
-        end
-    elseif event == "UNIT_SPELLCAST_SUCCEEDED" then
-        local unit, name = ...
-        if unit == "player" and name and playerSpells[name] then
-            CLEUcheck = true
-            CLEUtimeout = 0.50
-        end
+--------- Requests BG scoreboard data ---------
+local function BattlefieldScoreRequest()
+	if WorldStateScoreFrame and WorldStateScoreFrame:IsShown() then return end
+	SetBattlefieldScoreFaction()
+	RequestBattlefieldScoreData()
+end
+
+--------- Updates BG scoreboard player and related healer data ---------
+local function BattlefieldScoreUpdate()
+    if not playerFaction then return end
+    if not (WorldStateScoreFrame and WorldStateScoreFrame:IsShown() and WorldStateScoreFrame.selectedTab and WorldStateScoreFrame.selectedTab > 1) then
+        UpdateCurrentBGplayers()
+        UpdateWSSFhealers()
+        UpdatePublicHealerCount()
     end
 end
 
-local function UpdateHealersCount()
-    local hordeCount, allianceCount = 0, 0
-    for _, data in pairs(CLEUhealers) do
-        if data.faction == 0 then
-            hordeCount = hordeCount + 1
-        elseif data.faction == 1 then
-            allianceCount = allianceCount + 1
-        end
-    end
-    for _, data in pairs(WSSFhealers) do
-        if data.faction == 0 then
-            hordeCount = hordeCount + 1
-        elseif data.faction == 1 then
-            allianceCount = allianceCount + 1
-        end
-    end
-    BGH.AllianceCount = allianceCount
-    BGH.HordeCount = hordeCount
-end
-
+---------- Periodically requests BG Score and fix the Combat Log if it's unresponsive ----------
 local lastUpdateTime = 0
-local UPDATE_INTERVAL = 5
----------- Periodically updates healer lists and fix the Combat Log if it's unresponsive ----------
-local function OnUpdate(self, elapsed)
+local function BGupdater(self, elapsed)
     lastUpdateTime = lastUpdateTime + elapsed
-    if lastUpdateTime >= UPDATE_INTERVAL then
-        if not (WorldStateScoreFrame:IsShown() and WorldStateScoreFrame.selectedTab and WorldStateScoreFrame.selectedTab > 1) then
-            SetBattlefieldScoreFaction()
-            RequestBattlefieldScoreData()
-            UpdateCurrentBGplayers()
-            UpdateWSSFhealers()
-            UpdateHealersCount()
-        end
+    if lastUpdateTime >= 5 then
+        BattlefieldScoreRequest()
+        BattlefieldScoreUpdate()
         UpdateCLEUstate()
         lastUpdateTime = 0
     end
@@ -747,17 +661,275 @@ local function OnUpdate(self, elapsed)
 	end
 end
 
+--------- Updates the friendly player class cache for healer-capable classes ---------
+local function UpdateFriendlyHealerCandidates()
+	wipe(FriendlyHealerCandidates)
+    local name, class, _
+	for i = 1 , GetNumRaidMembers() do
+		name, _, _, _, _, class = GetRaidRosterInfo(i)
+		if name and class and HealerSpells[class] then
+			name = name:match("([^%-]+).*")
+            FriendlyHealerCandidates[name] = class
+		end
+	end
+end
+
+--------- Maps Battleground IDs to their English names ---------
+local BGNameByID = {
+	[444] = "Warsong Gulch",
+	[462] = "Arathi Basin",
+	[402] = "Alterac Valley",
+	[483] = "Eye of the Storm",
+	[513] = "Strand of the Ancients",
+	[541] = "Isle of Conquest",
+}
+
+--------- Maps localized Battleground names to their English equivalents ---------
+local BGName = {}
+for _, englishName in pairs(BGNameByID) do
+    BGName[L[englishName]] = englishName
+end
+
+--------- Returns the current Battleground name in English ---------
+local function GetBGName()
+    if not inBG then return end
+    for i = 1, MAX_BATTLEFIELD_QUEUES do
+        local queueStatus, queueMapName = GetBattlefieldStatus(i)
+        if queueStatus == "active" then
+            return BGName[queueMapName]
+        end
+    end
+    local bgName = BGName[GetRealZoneText()]
+    if not bgName then
+        SetMapToCurrentZone()
+        bgName = BGNameByID[GetCurrentMapAreaID()]
+    end
+    return bgName
+end
+
+--------- Sets the player's BG faction and stores it across relogs during the current BG session ---------
+local function SetPlayerFaction(faction)
+    faction = faction or (UnitFactionGroup("player") == "Horde" and 0 or 1)
+    playerFaction = faction
+    BGHchar.bgFaction = faction
+    if debugMode then
+        BGHprint(GetBGName(), "-", GetFactionColorHEX(playerFaction) .. (playerFaction == 1 and "Alliance|r" or "Horde|r"))
+    end
+end
+
+--------- Alliance starting coordinates for each BG map ---------
+local startMapCoordsA = {
+	["Warsong Gulch"]           = {0.488647907972340, 0.135069295763970},
+	["Arathi Basin"]            = {0.311796873807910, 0.166063979268070},
+	["Alterac Valley"]          = {0.536291122436520, 0.075191102921963},
+	["Eye of the Storm"]        = {0.468470871448520, 0.260840028524400},
+	["Isle of Conquest"]        = {0.529043495655060, 0.809421181678770},
+}
+
+--------- Horde starting coordinates for each BG map ---------
+local startMapCoordsH = {
+	["Warsong Gulch"]           = {0.530568122863770, 0.907359302043910},
+	["Arathi Basin"]            = {0.670242488384250, 0.704044997692110},
+	["Alterac Valley"]          = {0.564327776432040, 0.893128037452700},
+	["Eye of the Storm"]        = {0.493651777505870, 0.733544349670410},
+	["Isle of Conquest"]        = {0.505528688430790, 0.229658007621770},
+}
+
+--------- Checks whether a value is within the specified range ---------
+local function inRange(val, min, max)
+	return min <= val and val <= max
+end
+
+--------- Checks if coordinates match the Alliance starting position of a BG ---------
+local function isAllyStartPosition(x, y, mapName)
+    local cords = startMapCoordsA[mapName]
+    if not cords then return end
+	if inRange(x, cords[1] - 0.002, cords[1] + 0.002) and inRange(y, cords[2] - 0.004, cords[2] + 0.004) then
+		return true
+	end
+end
+
+--------- Checks if coordinates match the Horde starting position of a BG ---------
+local function isHordeStartPosition(x, y, mapName)
+    local cords = startMapCoordsH[mapName]
+    if not cords then return end
+	if inRange(x, cords[1] - 0.002, cords[1] + 0.002) and inRange(y, cords[2] - 0.004, cords[2] + 0.004) then
+		return true
+	end
+end
+
+--------- Checks if coordinates match the Strand of the Ancients defender starting position ---------
+local function isSotaDefenderPosition(x, y)
+    if inRange(x, 0.48, 0.50) and inRange(y, 0.565, 0.595) then
+        return true
+    end
+end
+
+--------- Detects faction from the BG scoreboard as a fallback method ---------
+local scoreboardFactionDetector = CreateFrame("Frame")
+scoreboardFactionDetector:Hide()
+scoreboardFactionDetector:SetScript("OnUpdate", function(self, elapsed)
+	if inBG and GetNumBattlefieldScores() == 0 then return end
+	self:Hide()
+	if not inBG then return end
+    local name, faction, _
+    local playerName = UnitName("player")
+    for i = 1, GetNumBattlefieldScores() do
+        name, _, _, _, _, faction = GetBattlefieldScore(i)
+        if playerName == name then
+            SetPlayerFaction(faction)
+            break
+        end
+    end
+end)
+local function DetectFactionFromScoreboard()
+    if scoreboardFactionDetector:IsShown() then return end
+    BattlefieldScoreRequest()
+    scoreboardFactionDetector:Show()
+end
+
+--------- Detects faction in Strand of the Ancients using starting coordinates ---------
+local SotAFactionDetector = CreateFrame("Frame")
+SotAFactionDetector:Hide()
+SotAFactionDetector:SetScript("OnUpdate", function(self, elapsed)
+    self.timer = (self.timer or 0) + elapsed
+    if self.timer < 0.4 then return end
+    self:Hide()
+    self.timer = 0
+    if not inBG or playerFaction then return end
+    local faction
+    if select(2, GetWorldStateUIInfo(2)) == 0 then
+        -- Ally Defending SotA
+        if isSotaDefenderPosition(self.x, self.y) then
+            faction = 1
+        else
+            faction = 0
+        end
+    else
+        -- Horde Defending SotA
+        if isSotaDefenderPosition(self.x, self.y) then
+            faction = 0
+        else
+            faction = 1
+        end
+    end
+    SetPlayerFaction(faction)
+end)
+local function DetectSotAFaction(x, y)
+    if SotAFactionDetector:IsShown() then return end
+    SotAFactionDetector.x = x
+    SotAFactionDetector.y = y
+    SotAFactionDetector.timer = 0
+    SotAFactionDetector:Show()
+end
+
+--------- Detects faction from starting coordinates to support any cross-faction system ---------
+local factionDetector = CreateFrame("Frame")
+factionDetector:Hide()
+factionDetector:SetScript("OnUpdate", function(self, elapsed)
+    self.timer = (self.timer or 0) + elapsed
+    if self.timer < 0.1 then return end
+    self:Hide()
+    self.timer = 0
+    if not inBG or playerFaction then return end
+	if BGHchar.bgFaction then
+        SetPlayerFaction(BGHchar.bgFaction)
+	else
+        local bgName = GetBGName()
+        local x, y = GetPlayerMapPosition("player")
+        if not (bgName and x and y) then
+            DetectFactionFromScoreboard()
+            return
+        end
+        if bgName == "Strand of the Ancients" then
+            DetectSotAFaction(x, y)
+            return
+        end
+        local faction
+        if isAllyStartPosition(x, y, bgName) then 	
+            faction = 1
+        elseif isHordeStartPosition(x, y, bgName) then
+            faction = 0
+        end
+        if not faction then
+            DetectFactionFromScoreboard()
+            return
+        end
+        SetPlayerFaction(faction)
+	end
+end)
+local function DetectFaction()
+    if factionDetector:IsShown() then return end
+    factionDetector.timer = 0
+    factionDetector:Show()
+end
+
+--------- Init tracking state when joining a BG ---------
+local function InitTrackingState()
+    UpdateFriendlyHealerCandidates()
+    BattlefieldScoreRequest()
+    DetectFaction()
+    EventHandler:SetScript("OnUpdate", BGupdater) 
+end
+
+--------- Reset tracking state before joining other BG ---------
+local function ResetTrackingState()
+    EventHandler:SetScript("OnUpdate",nil)
+    EventHandler:UnregisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
+    EventHandler:UnregisterEvent("UNIT_SPELLCAST_SUCCEEDED")
+    CLEUregistered = false
+    USSregistered = false
+    scoreboardFactionDetector:Hide()
+    SotAFactionDetector:Hide()
+    factionDetector:Hide()
+    playerFaction = false
+    BGHchar.bgFaction = nil
+    CurrentBGplayers = {} 
+    lastUpdateTime = 0
+    lastCLEUtime = nil
+    CLEUtimeout = nil
+    CLEUcheck = false
+    wipe(FriendlyHealerCandidates)
+    ClearHealers(CLEUhealers)
+    ClearHealers(WSSFhealers)
+    BGH_Public.AllianceCount = 0
+    BGH_Public.HordeCount = 0
+end
+
+local function UpdateAllIconAnchors()
+    for plate, BGHframe in pairs(AllNamePlates) do
+        if BGHframe.icon then
+            UpdateIconAnchor(BGHframe)
+        end
+    end
+end
+
+local function UpdateAllIconSizes()
+    for plate, BGHframe in pairs(AllNamePlates) do
+        if BGHframe.icon then
+            UpdateIconSize(BGHframe)
+        end
+    end
+end
+
+local function UpdateAllIconTextures()
+    for plate, BGHframe in pairs(AllNamePlates) do
+        if BGHframe.icon then
+            UpdateIconTexture(BGHframe)
+        end
+    end
+end
+
+--------- Reports the list of detected healers in the specified chat channel ---------
 local lastPrintTime = 0
-local printCooldown = 5
----------------- Prints the list of detected healers with a cooldown control ----------------
 local function PrintDetectedHealers()
     if not inBG then
         BGHprint(L["Print failed (not in BG)"])
         return
     end
     local currentTime = GetTime()
-    if currentTime - lastPrintTime < printCooldown then
-        local timeRemaining = printCooldown - (currentTime - lastPrintTime)
+    if currentTime - lastPrintTime < 5 then
+        local timeRemaining = 5 - (currentTime - lastPrintTime)
         BGHprint(string_format(L["Wait %.1f s to print again."], timeRemaining))
         return
     end
@@ -766,10 +938,10 @@ local function PrintDetectedHealers()
     local hordeHealers = {}
     local hordeHealersColored = {}
     local function AppendHealers(healersList)
-        for name, data in pairs(healersList) do
-            local color = RAID_CLASS_COLORS and RAID_CLASS_COLORS[data.class]
-            local coloredName = color and RGBToHex(color.r, color.g, color.b) .. name .. "|r" or name
-            if data.faction == 1 then
+        for name, healerData in pairs(healersList) do
+            local color = RAID_CLASS_COLORS and RAID_CLASS_COLORS[healerData.class]
+            local coloredName = color and RGBtoHEX(color.r, color.g, color.b) .. name .. "|r" or name
+            if healerData.faction == 1 then
                 table_insert(allianceHealers, name)
                 table_insert(allianceHealersColored, coloredName)
             else
@@ -784,41 +956,34 @@ local function PrintDetectedHealers()
     if BGHsettings.CLEUtracking == 1 then
         AppendHealers(CLEUhealers)
     end
-    local BGNameByID = {
-        [444] = L["Warsong Gulch"],
-        [462] = L["Arathi Basin"],
-        [402] = L["Alterac Valley"],
-        [483] = L["Eye of the Storm"],
-        [513] = L["Strand of the Ancients"],
-        [541] = L["Isle of Conquest"],
-    }
-    SetMapToCurrentZone()
-    local BGName = BGNameByID[GetCurrentMapAreaID()] or "current BG"
+    local bgName = GetBGName() or "[unknown BG]"
     local printChannel
     if BGHsettings.printChannel == "BG" then
         printChannel = "BATTLEGROUND"
     elseif BGHsettings.printChannel == "Party" then
         printChannel = "PARTY"
+    elseif BGHsettings.printChannel == "Raid" then
+        printChannel = "RAID"
     elseif BGHsettings.printChannel == "Guild" then
         printChannel = "GUILD"
     else
         printChannel = nil
     end
     if printChannel then
-        SendChatMessage(string_format("[BattleGroundHealers] " .. L["Healers detected in %s:"], BGName), printChannel)
-        SendChatMessage(string_format(" - %d %s: %s", #allianceHealers, L["Alliance"], table.concat(allianceHealers, ", ")), printChannel)
-        SendChatMessage(string_format(" - %d %s: %s", #hordeHealers, L["Horde"], table.concat(hordeHealers, ", ")), printChannel)
+        SendChatMessage(string_format("[BattleGroundHealers] Healers detected in %s:", bgName), printChannel)
+        SendChatMessage(string_format(" - %d Alliance: %s", #allianceHealers, table.concat(allianceHealers, ", ")), printChannel)
+        SendChatMessage(string_format(" - %d Horde: %s", #hordeHealers, table.concat(hordeHealers, ", ")), printChannel)
     else
         print("|cff00FF98================ BattleGroundHealers ================|r")
-        print(string_format(" " .. L["Healers detected in %s:"], "|cffffd100" .. BGName .. "|r"))
-        print(string_format("%s  - %d %s:|r %s", HEX_COLOR_ALLIANCE, #allianceHealersColored, L["Alliance"], table.concat(allianceHealersColored, ", ")))
-        print(string_format("%s  - %d %s:|r %s", HEX_COLOR_HORDE, #hordeHealersColored, L["Horde"], table.concat(hordeHealersColored, ", ")))
+        print(string_format(" Healers detected in |cffffd100%s|r:", bgName))
+        print(string_format("  |cff00aeef- %d Alliance:|r %s", #allianceHealersColored, table.concat(allianceHealersColored, ", ")))
+        print(string_format("  |cffe63c3c- %d Horde:|r %s", #hordeHealersColored, table.concat(hordeHealersColored, ", ")))
         print("|cff00FF98==================================================|r")
     end
     lastPrintTime = currentTime
 end
 
----------------------------- Creates a panel to manage the configuration settings  ----------------------------
+---------------------------- Configuration settings UI ----------------------------
 local function ConfigUI()
     if not BGHConfigUIglobalFrame then
         local ConfigUIFrame = CreateFrame("Frame", "BGHConfigUIglobalFrame", UIParent)
@@ -888,18 +1053,9 @@ local function ConfigUI()
             return leftLine, rightLine
         end
 
-        local function invertTextureColor(texture)
-            if texture:find("Blue") then
-                return texture:gsub("Blue", "Red")
-            elseif texture:find("Red") then
-                return texture:gsub("Red", "Blue")
-            end
-            return texture
-        end
-
         ---------- Healer Detection Methods ----------
         ConfigUIFrame.subtitle1 = ConfigUIFrame:CreateFontString(nil,"ARTWORK") 
-        ConfigUIFrame.subtitle1:SetFont("Fonts\\FRIZQT__.TTF", 11)
+        ConfigUIFrame.subtitle1:SetFont(GameFontNormal:GetFont(), 11)
         ConfigUIFrame.subtitle1:SetPoint("TOP", 0, -53)
         ConfigUIFrame.subtitle1:SetText(L["Healer Detection Methods"])
         ConfigUIFrame.subtitle1:SetTextColor(1, 0.82, 0, 1)
@@ -920,7 +1076,7 @@ local function ConfigUI()
                 BGHsettings.CLEUfix = 1
             else
                 BGHsettings.CLEUfix = 0
-                CLEUframe:UnregisterEvent("UNIT_SPELLCAST_SUCCEEDED")
+                EventHandler:UnregisterEvent("UNIT_SPELLCAST_SUCCEEDED")
                 USSregistered = false
             end
         end)    
@@ -944,25 +1100,21 @@ local function ConfigUI()
         CLEUtrackingCheckbox:SetScript("OnClick", function(self)
             if self:GetChecked() then
                 BGHsettings.CLEUtracking = 1
-                if inBG then
-                    UpdateCurrentBGplayers()
-                    UpdateCLEUstate()
-                end
+                UpdateCurrentBGplayers()
+                UpdateCLEUstate()
                 CLEUfixCheckbox.Text:SetTextColor(1, 1, 1)
                 CLEUfixCheckbox:Enable()
             else
                 BGHsettings.CLEUtracking = 0
-                CLEUframe:UnregisterEvent("UNIT_SPELLCAST_SUCCEEDED")
+                EventHandler:UnregisterEvent("UNIT_SPELLCAST_SUCCEEDED")
                 USSregistered = false
                 CLEUfixCheckbox.Text:SetTextColor(0.5, 0.5, 0.5)
                 CLEUfixCheckbox:Disable()
-                CLEUframe:UnregisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
+                EventHandler:UnregisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
                 CLEUregistered = false
                 ClearHealers(CLEUhealers)
-                if inBG then
-                    UpdateCurrentBGplayers()
-                    UpdateWSSFhealers()
-                end   
+                UpdateCurrentBGplayers()
+                UpdateWSSFhealers()
             end
         end)    
 
@@ -978,10 +1130,8 @@ local function ConfigUI()
         WSSFtrackingCheckbox:SetScript("OnClick", function(self)
             if self:GetChecked() then
                 BGHsettings.WSSFtracking = 1
-                if inBG then
-                    UpdateCurrentBGplayers()
-                    UpdateWSSFhealers()
-                end
+                UpdateCurrentBGplayers()
+                UpdateWSSFhealers()
             else
                 BGHsettings.WSSFtracking = 0
                 ClearHealers(WSSFhealers)
@@ -1003,7 +1153,7 @@ local function ConfigUI()
         printChannelDropdown.Text:ClearAllPoints()
         printChannelDropdown.Text:SetPoint("CENTER", printChannelDropdown, "CENTER", -5, 3)
         printChannelDropdown.Text:SetJustifyH("CENTER")
-        printChannelDropdown.Options = {"BG", "Party", "Guild", L["Self"]}
+        printChannelDropdown.Options = {"BG", "Party", "Raid", "Guild", "Self"}
         UIDropDownMenu_SetWidth(printChannelDropdown, 60)
         UIDropDownMenu_SetText(printChannelDropdown, BGHsettings.printChannel or "BG")
         UIDropDownMenu_Initialize(printChannelDropdown, function(self, level)
@@ -1019,7 +1169,7 @@ local function ConfigUI()
                 UIDropDownMenu_AddButton(info, level)
             end
         end)
-      
+
         -- Print Healers (Button)
         local printHealersButton = CreateFrame("Button", "BGHConfigUIprintHealersButton", ConfigUIFrame, "UIPanelButtonTemplate")
         printHealersButton:SetSize(91, 26)
@@ -1028,11 +1178,20 @@ local function ConfigUI()
         printHealersButton:SetText(L["Print Healers"])
         printHealersButton:SetScript("OnClick", function()
             PrintDetectedHealers()
-        end)   
+        end)
+        printHealersButton:SetScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:SetText("/bgh print")
+            GameTooltip:Show()
+        end)
+        printHealersButton:SetScript("OnLeave", function()
+            GameTooltip:Hide()
+        end)
 
         ----------- Icon Display Settings -----------
         ConfigUIFrame.subtitle2 = ConfigUIFrame:CreateFontString(nil,"ARTWORK") 
         ConfigUIFrame.subtitle2:SetFont("Fonts\\FRIZQT__.TTF", 11)
+        ConfigUIFrame.subtitle2:SetFont(GameFontNormal:GetFont(), 11)
         ConfigUIFrame.subtitle2:SetPoint("TOP", 0, -204)
         ConfigUIFrame.subtitle2:SetText(L["Icon Display Settings"])
         ConfigUIFrame.subtitle2:SetTextColor(1, 0.82, 0, 1)
@@ -1059,7 +1218,7 @@ local function ConfigUI()
         iconSizeSlider:SetScript("OnValueChanged", function(self, value)
             BGHsettings.iconSize = math_floor(value + 0.5)
             iconSizeSlider.Value:SetText(math_floor(value + 0.5))
-            UpdateAllMarks()
+            UpdateAllIconSizes()
         end)
 
         -- Icon Style (Dropdown)
@@ -1089,12 +1248,7 @@ local function ConfigUI()
                 info.func = function()
                     BGHsettings.iconStyle = iconStyle
                     UIDropDownMenu_SetText(iconStyleDropdown, iconStyle)
-                    for name, texture in pairs(MarkedNames) do
-                        local color = texture:find("Red") and "Red" or "Blue"
-                        local newTexture = IconTextures[BGHsettings.iconStyle][color]
-                        SetBGHmark(name, newTexture)
-                    end
-                    UpdateAllMarks()
+                    UpdateAllIconTextures()
                 end
                 UIDropDownMenu_AddButton(info, level)
             end
@@ -1121,7 +1275,7 @@ local function ConfigUI()
         iconXoffsetSlider:SetScript("OnValueChanged", function(self, value)
             BGHsettings.iconXoffset = math_floor(value + 0.5)
             iconXoffsetSlider.Value:SetText(math_floor(value + 0.5))
-            UpdateAllMarks()
+            UpdateAllIconAnchors()
         end)
 
         -- Icon Y offset (Slider)
@@ -1145,7 +1299,7 @@ local function ConfigUI()
         iconYoffsetSlider:SetScript("OnValueChanged", function(self, value)
             BGHsettings.iconYoffset = math_floor(value + 0.5)
             iconYoffsetSlider.Value:SetText(math_floor(value + 0.5))
-            UpdateAllMarks()
+            UpdateAllIconAnchors()
         end)
 
         -- Icon Anchor (Dropdown)
@@ -1181,7 +1335,7 @@ local function ConfigUI()
                     BGHsettings.iconYoffset = 0
                     iconYoffsetSlider:SetValue(BGHsettings.iconYoffset)
                     iconYoffsetSlider.Value:SetText(BGHsettings.iconYoffset)
-                    UpdateAllMarks()
+                    UpdateAllIconAnchors()
                 end
                 UIDropDownMenu_AddButton(info, level)
             end
@@ -1198,15 +1352,12 @@ local function ConfigUI()
         iconInvertColorCheckbox:SetChecked(BGHsettings.iconInvertColor == 1)
         iconInvertColorCheckbox:SetScript("OnClick", function(self)
             BGHsettings.iconInvertColor = self:GetChecked() and 1 or 0
-            for name, texture in pairs(MarkedNames) do
-                MarkedNames[name] = invertTextureColor(texture)
-            end
-            UpdateAllMarks()
+            UpdateAllIconTextures()
         end)    
 
         -- Mark Target (Button)
         local testMarkButton = CreateFrame("Button", "BGHConfigUItestMarkButton", ConfigUIFrame, "UIPanelButtonTemplate")
-        local testModeMarkedNames = {}
+        local testModeMarks = {}
         testMarkButton:SetSize(95, 26)
         testMarkButton:GetFontString():SetFont(testMarkButton:GetFontString():GetFont(), 10.5)
         testMarkButton:SetPoint("TOPRIGHT", -34, -460)
@@ -1217,19 +1368,13 @@ local function ConfigUI()
             if name then
                 if MarkedNames[name] then
                     SetBGHmark(name, nil)
-                    for i, markedName in ipairs(testModeMarkedNames) do
-                        if markedName == name then
-                            table_remove(testModeMarkedNames, i)
-                            break
-                        end
-                    end
+                    testModeMarks[name] = nil
                 else
-                    local isFriendly = not UnitCanAttack("player", "target")
-                    SetBGHmark(name, ((BGHsettings.iconInvertColor == 1) == isFriendly) and IconTextures[BGHsettings.iconStyle].Red or IconTextures[BGHsettings.iconStyle].Blue)
-                    table_insert(testModeMarkedNames, name)
+                    SetBGHmark(name, UnitCanAttack("player", "target") and "ENEMY" or "FRIEND")
+                    testModeMarks[name] = true
                 end
             end
-            UpdateAllMarks()
+            UpdateAllIconTextures()
         end)
 
         -- Test Mode (Checkbox)
@@ -1244,13 +1389,15 @@ local function ConfigUI()
         testModeCheckbox:SetScript("OnClick", function(self)
             if self:GetChecked() then
                 testMarkButton:Enable()
+                testMode = true
             else
                 testMarkButton:Disable()
-                for _, name in ipairs(testModeMarkedNames) do
+                testMode = false
+                for name in pairs(testModeMarks) do
                     SetBGHmark(name, nil)
+                    testModeMarks[name] = nil
                 end
-                testModeMarkedNames = {}
-                UpdateAllMarks()
+                UpdateAllIconTextures()
             end
         end)    
 
@@ -1268,18 +1415,6 @@ local function ConfigUI()
                 button2 = L["No"],
                 OnAccept = function()
                     BGHprint(L["Settings reset to default values."])
-                    if BGHsettings.iconInvertColor ~= DefaultSettings.iconInvertColor then
-                        for name, texture in pairs(MarkedNames) do
-                            MarkedNames[name] = invertTextureColor(texture)
-                        end
-                    end
-                    if BGHsettings.iconStyle ~= DefaultSettings.iconStyle then
-                        for name, texture in pairs(MarkedNames) do
-                            local color = texture:find("Red") and "Red" or "Blue"
-                            local newTexture = IconTextures[DefaultSettings.iconStyle][color]
-                            SetBGHmark(name, newTexture)
-                        end
-                    end
                     for k, v in pairs(DefaultSettings) do
                         BGHsettings[k] = DefaultSettings[k]
                     end
@@ -1287,37 +1422,31 @@ local function ConfigUI()
                         CLEUfixCheckbox:SetChecked(true)
                     else
                         CLEUfixCheckbox:SetChecked(false)
-                        CLEUframe:UnregisterEvent("UNIT_SPELLCAST_SUCCEEDED")
+                        EventHandler:UnregisterEvent("UNIT_SPELLCAST_SUCCEEDED")
                         USSregistered = false
                     end
                     if BGHsettings.CLEUtracking == 1 then
                         CLEUtrackingCheckbox:SetChecked(true)
                         CLEUfixCheckbox.Text:SetTextColor(1, 1, 1)
                         CLEUfixCheckbox:Enable()
-                        if inBG then
-                            UpdateCurrentBGplayers()
-                            UpdateCLEUstate()
-                        end
+                        UpdateCurrentBGplayers()
+                        UpdateCLEUstate()
                     else
                         CLEUtrackingCheckbox:SetChecked(false)
-                        CLEUframe:UnregisterEvent("UNIT_SPELLCAST_SUCCEEDED")
+                        EventHandler:UnregisterEvent("UNIT_SPELLCAST_SUCCEEDED")
                         USSregistered = false
                         CLEUfixCheckbox.Text:SetTextColor(0.5, 0.5, 0.5)
                         CLEUfixCheckbox:Disable()
-                        CLEUframe:UnregisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
+                        EventHandler:UnregisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
                         CLEUregistered = false
                         ClearHealers(CLEUhealers)
-                        if inBG then
-                            UpdateCurrentBGplayers()
-                            UpdateWSSFhealers()
-                        end
+                        UpdateCurrentBGplayers()
+                        UpdateWSSFhealers()
                     end
                     if BGHsettings.WSSFtracking == 1 then
-                        WSSFtrackingCheckbox:SetChecked(true)   
-                        if inBG then
-                            UpdateCurrentBGplayers()
-                            UpdateWSSFhealers()
-                        end
+                        WSSFtrackingCheckbox:SetChecked(true)
+                        UpdateCurrentBGplayers()
+                        UpdateWSSFhealers()
                     else
                         WSSFtrackingCheckbox:SetChecked(false)  
                         ClearHealers(WSSFhealers)
@@ -1329,7 +1458,9 @@ local function ConfigUI()
                     iconXoffsetSlider:SetValue(BGHsettings.iconXoffset)
                     iconYoffsetSlider:SetValue(BGHsettings.iconYoffset)
                     iconInvertColorCheckbox:SetChecked(BGHsettings.iconInvertColor == 1)
-                    UpdateAllMarks()
+                    UpdateAllIconAnchors()
+                    UpdateAllIconSizes()
+                    UpdateAllIconTextures()
                 end,
                 timeout = 0,
                 whileDead = true,
@@ -1376,11 +1507,12 @@ local function ConfigUI()
             if testModeCheckbox:GetChecked() then
                 testModeCheckbox:SetChecked(false)
                 testMarkButton:Disable()
-                for _, name in ipairs(testModeMarkedNames) do
+                testMode = false
+                for name in pairs(testModeMarks) do
                     SetBGHmark(name, nil)
+                    testModeMarks[name] = nil
                 end
-                testModeMarkedNames = {}
-                UpdateAllMarks()
+                UpdateAllIconTextures()
             end
         end)
     end
@@ -1425,71 +1557,113 @@ local function AddInterfaceOptions()
         end)
         settingsButton:SetPoint("TOPLEFT", description, "BOTTOMLEFT", 120, -18)
         settingsButton:GetFontString():SetPoint("CENTER", settingsButton, "CENTER", 0, 1)
-        settingsButton:GetFontString():SetFont("Fonts\\FRIZQT__.TTF", 14)
+        settingsButton:GetFontString():SetFont(GameFontNormal:GetFont(), 14)
         self:SetScript("OnShow", nil)
     end)
     InterfaceOptions_AddCategory(addonPanel)
 end
 
---------- Reset tracking state before joining other BG ---------
-local function ResetTrackingState()
-    BGH:SetScript("OnUpdate",nil)
-    CLEUframe:SetScript("OnEvent", nil)
-    CLEUframe:UnregisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
-    CLEUframe:UnregisterEvent("UNIT_SPELLCAST_SUCCEEDED")
-    CLEUregistered = false
-    USSregistered = false
-    playerFaction = false  
-    currentBGplayers = {} 
-    lastUpdateTime = 0
-    lastCLEUtime = nil
-    CLEUtimeout = nil
-    CLEUcheck = false
-    ClearHealers(CLEUhealers)
-    ClearHealers(WSSFhealers)
-    BGH.AllianceCount = 0
-    BGH.HordeCount = 0
-end
-
-------------------- Script to manage the addon's main frame events -------------------
-BGH:RegisterEvent("ADDON_LOADED")
-BGH:RegisterEvent("PLAYER_ENTERING_WORLD")
-BGH:RegisterEvent("UPDATE_BATTLEFIELD_STATUS")
-BGH:SetScript("OnEvent", function(self, event, ...)
-    if event == "ADDON_LOADED" and (...) == addonName then
-        AddInterfaceOptions()
+------------------- Event Handler -------------------
+function EventHandler:ADDON_LOADED(event, ...)
+    local addon = ...
+	if addon == AddonName then
         InitSettings()
         print(string_format(" |cff00FF98BattleGroundHealers|r v%s by |cffc41f3bKhal|r", version))
-        self:UnregisterEvent("ADDON_LOADED")
-    elseif event == "PLAYER_ENTERING_WORLD" then
-        local _, instanceType = IsInInstance()
-        if instanceType == "pvp" then
-            if not inBG then
-                RequestBattlefieldScoreData()
-                UpdateCurrentBGplayers()
-                UpdateWSSFhealers()
-                UpdateCLEUstate()
-            end
-            inBG = true
-            self:SetScript("OnUpdate", OnUpdate) 
-            CLEUframe:SetScript("OnEvent", CLEUhandler)
-        elseif inBG then
-            inBG = false
+        self:UnregisterEvent(event)
+        self[event] = nil
+	end
+end
+
+function EventHandler:PLAYER_LOGIN(event)
+    AddInterfaceOptions()
+    SetCVar("ShowClassColorInNameplate", 1)
+    self:UnregisterEvent(event)
+    self[event] = nil
+end
+
+function EventHandler:PLAYER_ENTERING_WORLD()
+    local _, instanceType = IsInInstance()
+    if instanceType == "pvp" then
+        inBG = true
+        InitTrackingState()
+    elseif inBG or BGHchar.bgFaction then
+        inBG = false
+        ResetTrackingState()
+    end
+end
+
+function EventHandler:RAID_ROSTER_UPDATE()
+    if not inBG then return end
+    UpdateFriendlyHealerCandidates()
+end
+
+function EventHandler:UPDATE_BATTLEFIELD_STATUS(event, ...)
+    local bgIndex = ...
+    if GetBattlefieldStatus(bgIndex) == "active" then
+        if not BGstatus[bgIndex] then
             ResetTrackingState()
         end
-    elseif event == "UPDATE_BATTLEFIELD_STATUS" then
-		local bgIndex = ...
-		local status = GetBattlefieldStatus(bgIndex)
-		if status == "active" then
-			if not BGStatus[bgIndex] then
-                ResetTrackingState()
-			end
-			BGStatus[bgIndex] = true
-		else
-			BGStatus[bgIndex] = false
-		end
+        BGstatus[bgIndex] = true
+    else
+        BGstatus[bgIndex] = false
     end
-end)
+end
+
+function EventHandler:COMBAT_LOG_EVENT_UNFILTERED(event, ...)
+    lastCLEUtime = GetTime()
+    if not playerFaction then return end
+    local _, subEvent, sourceGUID, sourceName, _, _, _, _, spellID = ...
+    if subEvent == "SPELL_CAST_SUCCESS" or subEvent == "SPELL_AURA_APPLIED" then
+        if not HealerSpellMap[spellID] then return end
+        local name = sourceName:match("([^%-]+).*")
+        if CLEUhealers[name] then return end
+        local _, class = GetPlayerInfoByGUID(sourceGUID)
+        if not HealerSpells[class] then return end
+        local faction, reaction
+        if FriendlyHealerCandidates[name] == class then
+            reaction = "FRIEND"
+            faction = playerFaction
+        else
+            reaction = "ENEMY"
+            faction = math_abs(playerFaction - 1)
+            if BGH_Notifier.OnHealerDetected then
+                pcall(BGH_Notifier.OnHealerDetected, sourceName, class)
+            end
+        end
+        SetBGHmark(name, reaction)
+        CLEUhealers[name] = {class = class, faction = faction}
+        if debugMode then
+            BGHprint(string_format("Debug: %s (%s) added to Combat Log healers list (spellID: %s)", name, faction == 1 and "Alliance" or "Horde", spellID))
+        end 
+        if WSSFhealers[name] then
+            WSSFhealers[name] = nil
+            if debugMode then
+                BGHprint(string_format("Debug: %s (%s) removed from BG Scoreboard healers list (Combat Log list priority).", name, faction == 1 and "Alliance" or "Horde"))
+            end
+        end
+    end
+end
+
+function EventHandler:UNIT_SPELLCAST_SUCCEEDED(event, ...)
+    local unit, name = ...
+    if unit == "player" and name and playerSpells[name] then
+        CLEUcheck = true
+        CLEUtimeout = 0.50
+    end
+end
+
+function EventHandler:OnEvent(event, ...)
+	if self[event] then
+		return self[event](self, event, ...)
+	end
+end
+
+EventHandler:SetScript("OnEvent", EventHandler.OnEvent)
+EventHandler:RegisterEvent("ADDON_LOADED")
+EventHandler:RegisterEvent("PLAYER_LOGIN")
+EventHandler:RegisterEvent("PLAYER_ENTERING_WORLD")
+EventHandler:RegisterEvent("RAID_ROSTER_UPDATE")
+EventHandler:RegisterEvent("UPDATE_BATTLEFIELD_STATUS")
 
 ------------------------ Slash Commands ------------------------
 SLASH_BGH1 = "/bgh"
@@ -1502,7 +1676,7 @@ SlashCmdList["BGH"] = function(msg)
         PrintDetectedHealers()
     elseif cmd == "msg" then
             BGHsettings.showMessages = BGHsettings.showMessages == 1 and 0 or 1
-            BGHprint("Chat messages " .. (BGHsettings.showMessages == 1 and (HEX_GREEN .. "Enabled" .. "|r") or (HEX_RED .. "Disabled" .. "|r")))
+            BGHprint("Chat messages " .. (BGHsettings.showMessages == 1 and "|cff88FF88Enabled|r" or "|cffff4444Disabled|r"))
     elseif (cmd == "h2d") then
         if (not args or args == "") then
             BGHprint(L["Current BG Scoreboard healing-to-damage tracking ratio:"], BGHsettings.h2dRatio);
@@ -1534,11 +1708,10 @@ SlashCmdList["BGH"] = function(msg)
     elseif cmd == "debug" then
         if debugMode then 
             debugMode = false
-            BGHprint("Debug mode " .. HEX_RED .. "Disabled" .. "|r")
+            BGHprint("Debug mode |cffff4444Disabled|r")
         else 
             debugMode = true
-            BGHprint("Debug mode " .. HEX_GREEN .. "Enabled" .. "|r")
+            BGHprint("Debug mode |cff88FF88Enabled|r")
         end
     end
 end
-_G.SetBGHmark = SetBGHmark
