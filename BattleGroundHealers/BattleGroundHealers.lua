@@ -469,7 +469,7 @@ local function GetFactionColorHEX(faction)
 end
 
 --------- Removes healers who are no longer present in the Battleground player list ---------
-local function ClearDeserterHealers(list, flag)
+local function ClearDeserterHealers(list)
     for name, healerData in pairs(list) do
         if not CurrentBGplayers[name] then
             if BGHsettings.showMessages == 1 or debugMode then
