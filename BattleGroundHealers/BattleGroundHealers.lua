@@ -507,7 +507,7 @@ local function UpdateCurrentBGplayers()
             CurrentBGplayers[name] = class
         end
     end
-    ClearDeserterHealers(WSSFhealers, true)
+    ClearDeserterHealers(WSSFhealers)
     ClearDeserterHealers(CLEUhealers)
 end
 
