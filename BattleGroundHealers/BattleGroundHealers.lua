@@ -469,7 +469,7 @@ local function GetFactionColorHEX(faction)
 end
 
 --------- Removes healers who are no longer present in the Battleground player list ---------
-local function ClearDeserterHealers(list)
+local function ClearDeserterHealers(list, flag)
     for name, healerData in pairs(list) do
         if not CurrentBGplayers[name] then
             if BGHsettings.showMessages == 1 or debugMode then
@@ -507,7 +507,7 @@ local function UpdateCurrentBGplayers()
             CurrentBGplayers[name] = class
         end
     end
-    ClearDeserterHealers(WSSFhealers)
+    ClearDeserterHealers(WSSFhealers, true)
     ClearDeserterHealers(CLEUhealers)
 end
 
@@ -1617,6 +1617,7 @@ function EventHandler:COMBAT_LOG_EVENT_UNFILTERED(event, ...)
         if not HealerSpellMap[spellID] then return end
         local name = sourceName:match("([^%-]+).*")
         if CLEUhealers[name] then return end
+        if not CurrentBGplayers[name] then return end
         local _, class = GetPlayerInfoByGUID(sourceGUID)
         if not HealerSpells[class] then return end
         local faction, reaction
@@ -1641,6 +1642,7 @@ function EventHandler:COMBAT_LOG_EVENT_UNFILTERED(event, ...)
                 BGHprint(string_format("Debug: %s (%s) removed from BG Scoreboard healers list (Combat Log list priority).", name, faction == 1 and "Alliance" or "Horde"))
             end
         end
+
     end
 end
 
