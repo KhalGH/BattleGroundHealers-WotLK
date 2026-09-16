@@ -59,6 +59,7 @@ local EnemyPlates = {}
 local MarkedNames = {}
 local CurrentBGplayers = {}
 local FriendlyHealerCandidates = {}
+local ShortNames = {}
 local CLEUhealers = {}
 local WSSFhealers = {}
 local inBG = false
@@ -113,11 +114,11 @@ local HealerSpells = {
     },
     DRUID = {
         53251, 53249, 53248, 48438,                       -- Wild Growth
-        33891,                                            -- Tree of Life
+        33891, 34123,                                     -- Tree of Life
         18562,                                            -- Swiftmend
         17116,                                            -- Nature's Swiftness
         48504,                                            -- Living Seed
-        45283, 45282, 45281,                              -- Natural Perfection		
+        45283, 45282, 45281,                              -- Natural Perfection
     },
     PRIEST = {
         -- DISC
@@ -499,12 +500,16 @@ end
 local function UpdateCurrentBGplayers()
     if not (inBG and playerFaction) then return end
     CurrentBGplayers = {}
-    local name, class, _
+    local name, shortName, class, _
     for i = 1, GetNumBattlefieldScores() do
         name, _, _, _, _, _, _, _, class = GetBattlefieldScore(i)
         if name then
-            name = name:match("([^%-]+).*")
-            CurrentBGplayers[name] = class
+            shortName = ShortNames[name]
+            if not shortName then
+                shortName = name:match("([^%-]+).*")
+                ShortNames[name] = shortName
+            end
+            CurrentBGplayers[shortName] = class
         end
     end
     ClearDeserterHealers(WSSFhealers)
@@ -514,32 +519,36 @@ end
 ---------- Updates the list of healers based on the BG Scoreboard (WorldStateScoreFrame), prioritizing the Combat Log healers list if active ----------
 local function UpdateWSSFhealers()
     if not (inBG and playerFaction and BGHsettings.WSSFtracking == 1) then return end
-    local name, faction, localizedClass, damageDone, healingDone, reaction, healerClass, _
+    local name, shortName, faction, localizedClass, damageDone, healingDone, reaction, healerClass, _
     for i = 1, GetNumBattlefieldScores() do
         name, _, _, _, _, faction, _, _, localizedClass, _, damageDone, healingDone = GetBattlefieldScore(i)
         if name then
-            name = name:match("([^%-]+).*")
+            shortName = ShortNames[name]
+            if not shortName then
+                shortName = name:match("([^%-]+).*")
+                ShortNames[name] = shortName
+            end
             healerClass = HealerClassTokens[localizedClass]
             if healerClass and healingDone > BGHsettings.h2dRatio * damageDone and healingDone > BGHsettings.healingThreshold then      
-                if not WSSFhealers[name] and not CLEUhealers[name] then
-                    if FriendlyHealerCandidates[name] == healerClass then
+                if not WSSFhealers[shortName] and not CLEUhealers[shortName] then
+                    if FriendlyHealerCandidates[shortName] == healerClass then
                         reaction = "FRIEND"
                         faction = playerFaction
                     else
                         reaction = "ENEMY"
                         faction = math_abs(playerFaction - 1)
                     end
-                    SetBGHmark(name, reaction)
-                    WSSFhealers[name] = {class = healerClass, faction = faction}
+                    SetBGHmark(shortName, reaction)
+                    WSSFhealers[shortName] = {class = healerClass, faction = faction}
                     if debugMode then
-                        BGHprint(string_format("Debug: %s (%s) added to BG Scoreboard healers list.", name, faction == 1 and "Alliance" or "Horde"))
+                        BGHprint(string_format("Debug: %s (%s) added to BG Scoreboard healers list.", shortName, faction == 1 and "Alliance" or "Horde"))
                     end 
                 end
-            elseif WSSFhealers[name] then
-                SetBGHmark(name, nil)
-                WSSFhealers[name] = nil
+            elseif WSSFhealers[shortName] then
+                SetBGHmark(shortName, nil)
+                WSSFhealers[shortName] = nil
                 if debugMode then
-                    BGHprint(string_format("Debug: %s (%s) removed from BG Scoreboard healers list (below healing-to-damage ratio).", name, faction == 1 and "Alliance" or "Horde"))
+                    BGHprint(string_format("Debug: %s (%s) removed from BG Scoreboard healers list (below healing-to-damage ratio).", shortName, faction == 1 and "Alliance" or "Horde"))
                 end 
             end
         end
@@ -664,12 +673,16 @@ end
 --------- Updates the friendly player class cache for healer-capable classes ---------
 local function UpdateFriendlyHealerCandidates()
 	wipe(FriendlyHealerCandidates)
-    local name, class, _
+    local name, class, shortName, _
 	for i = 1 , GetNumRaidMembers() do
 		name, _, _, _, _, class = GetRaidRosterInfo(i)
 		if name and class and HealerSpells[class] then
-			name = name:match("([^%-]+).*")
-            FriendlyHealerCandidates[name] = class
+            shortName = ShortNames[name]
+            if not shortName then
+                shortName = name:match("([^%-]+).*")
+                ShortNames[name] = shortName
+            end
+            FriendlyHealerCandidates[shortName] = class
 		end
 	end
 end
@@ -890,6 +903,7 @@ local function ResetTrackingState()
     CLEUtimeout = nil
     CLEUcheck = false
     wipe(FriendlyHealerCandidates)
+    wipe(ShortNames)
     ClearHealers(CLEUhealers)
     ClearHealers(WSSFhealers)
     BGH_Public.AllianceCount = 0
@@ -1613,15 +1627,19 @@ function EventHandler:COMBAT_LOG_EVENT_UNFILTERED(event, ...)
     lastCLEUtime = GetTime()
     if not playerFaction then return end
     local _, subEvent, sourceGUID, sourceName, _, _, _, _, spellID = ...
-    if subEvent == "SPELL_CAST_SUCCESS" or subEvent == "SPELL_AURA_APPLIED" then
+    if subEvent == "SPELL_CAST_SUCCESS" or subEvent == "SPELL_AURA_APPLIED" or subEvent == "SPELL_AURA_REMOVED" or subEvent == "SPELL_AURA_REFRESH" then
         if not HealerSpellMap[spellID] then return end
-        local name = sourceName:match("([^%-]+).*")
-        if CLEUhealers[name] then return end
-        if not CurrentBGplayers[name] then return end
+        local shortName = ShortNames[sourceName]
+        if not shortName then
+            shortName = sourceName:match("([^%-]+).*")
+            ShortNames[sourceName] = shortName
+        end
+        if CLEUhealers[shortName] then return end
+        if not CurrentBGplayers[shortName] then return end
         local _, class = GetPlayerInfoByGUID(sourceGUID)
         if not HealerSpells[class] then return end
         local faction, reaction
-        if FriendlyHealerCandidates[name] == class then
+        if FriendlyHealerCandidates[shortName] == class then
             reaction = "FRIEND"
             faction = playerFaction
         else
@@ -1631,15 +1649,15 @@ function EventHandler:COMBAT_LOG_EVENT_UNFILTERED(event, ...)
                 pcall(BGH_Notifier.OnHealerDetected, sourceName, class)
             end
         end
-        SetBGHmark(name, reaction)
-        CLEUhealers[name] = {class = class, faction = faction}
+        SetBGHmark(shortName, reaction)
+        CLEUhealers[shortName] = {class = class, faction = faction}
         if debugMode then
-            BGHprint(string_format("Debug: %s (%s) added to Combat Log healers list (spellID: %s)", name, faction == 1 and "Alliance" or "Horde", spellID))
+            BGHprint(string_format("Debug: %s (%s) added to Combat Log healers list (spellID: %s)", shortName, faction == 1 and "Alliance" or "Horde", spellID))
         end 
-        if WSSFhealers[name] then
-            WSSFhealers[name] = nil
+        if WSSFhealers[shortName] then
+            WSSFhealers[shortName] = nil
             if debugMode then
-                BGHprint(string_format("Debug: %s (%s) removed from BG Scoreboard healers list (Combat Log list priority).", name, faction == 1 and "Alliance" or "Horde"))
+                BGHprint(string_format("Debug: %s (%s) removed from BG Scoreboard healers list (Combat Log list priority).", shortName, faction == 1 and "Alliance" or "Horde"))
             end
         end
 
