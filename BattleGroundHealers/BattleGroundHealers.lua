@@ -24,7 +24,12 @@
 -----------------------------------------------------------------------------------------------------
 
 local AddonName, BGH = ...
-local version = GetAddOnMetadata(AddonName, "Version")
+
+local LibNameplates = LibStub("LibNameplates-1.0", true)
+if not LibNameplates then
+	error(AddonName .. " requires LibNameplates-1.0.")
+	return
+end
 
 local DefaultSettings = {
     CLEUtracking = 1,           -- Detect healers via Combat Log (1 = enabled, 0 = disabled)
@@ -44,8 +49,8 @@ local DefaultSettings = {
 
 local setmetatable, print, next, ipairs, pairs, unpack, rawset, rawget, select, pcall, string_format, string_lower, string_find, table_insert, table_remove, math_sqrt, math_abs, math_floor, math_min, math_max, tonumber =
       setmetatable, print, next, ipairs, pairs, unpack, rawset, rawget, select, pcall, string.format, string.lower, string.find, table.insert, table.remove, math.sqrt, math.abs, math.floor, math.min, math.max, tonumber
-local CreateFrame, GetSpellInfo, GetBattlefieldStatus, SetBattlefieldScoreFaction, RequestBattlefieldScoreData, GetNumBattlefieldScores, GetBattlefieldScore, GetNumRaidMembers, GetRaidRosterInfo, IsInInstance, CombatLogClearEntries, GetRealZoneText, SetMapToCurrentZone, GetCurrentMapAreaID, GetPlayerMapPosition, SendChatMessage, UnitName, UnitFactionGroup, UnitAura, UnitCanAttack, GetTime, GetPlayerInfoByGUID, GetWorldStateUIInfo, wipe, GetCVar, SetCVar =
-      CreateFrame, GetSpellInfo, GetBattlefieldStatus, SetBattlefieldScoreFaction, RequestBattlefieldScoreData, GetNumBattlefieldScores, GetBattlefieldScore, GetNumRaidMembers, GetRaidRosterInfo, IsInInstance, CombatLogClearEntries, GetRealZoneText, SetMapToCurrentZone, GetCurrentMapAreaID, GetPlayerMapPosition, SendChatMessage, UnitName, UnitFactionGroup, UnitAura, UnitCanAttack, GetTime, GetPlayerInfoByGUID, GetWorldStateUIInfo, wipe, GetCVar, SetCVar
+local CreateFrame, GetSpellInfo, GetBattlefieldStatus, SetBattlefieldScoreFaction, RequestBattlefieldScoreData, GetNumBattlefieldScores, GetBattlefieldScore, GetNumRaidMembers, GetRaidRosterInfo, IsInInstance, CombatLogClearEntries, GetRealZoneText, SetMapToCurrentZone, GetCurrentMapAreaID, GetPlayerMapPosition, SendChatMessage, UnitName, UnitFactionGroup, UnitAura, UnitCanAttack, GetTime, GetPlayerInfoByGUID, GetWorldStateUIInfo, wipe, GetCVar, SetCVar, GetAddOnMetadata =
+      CreateFrame, GetSpellInfo, GetBattlefieldStatus, SetBattlefieldScoreFaction, RequestBattlefieldScoreData, GetNumBattlefieldScores, GetBattlefieldScore, GetNumRaidMembers, GetRaidRosterInfo, IsInInstance, CombatLogClearEntries, GetRealZoneText, SetMapToCurrentZone, GetCurrentMapAreaID, GetPlayerMapPosition, SendChatMessage, UnitName, UnitFactionGroup, UnitAura, UnitCanAttack, GetTime, GetPlayerInfoByGUID, GetWorldStateUIInfo, wipe, GetCVar, SetCVar, GetAddOnMetadata
 local UIDropDownMenu_SetWidth, UIDropDownMenu_SetText, UIDropDownMenu_Initialize, UIDropDownMenu_CreateInfo, UIDropDownMenu_AddButton, StaticPopup_Show, InterfaceOptions_AddCategory, InterfaceOptionsFrameCancel_OnClick, HideUIPanel =
       UIDropDownMenu_SetWidth, UIDropDownMenu_SetText, UIDropDownMenu_Initialize, UIDropDownMenu_CreateInfo, UIDropDownMenu_AddButton, StaticPopup_Show, InterfaceOptions_AddCategory, InterfaceOptionsFrameCancel_OnClick, HideUIPanel
 local LOCALIZED_CLASS_NAMES_MALE, LOCALIZED_CLASS_NAMES_FEMALE, RAID_CLASS_COLORS, WorldFrame, WorldStateScoreFrame =
@@ -261,9 +266,11 @@ local function UpdateIconTexture(BGHframe)
     if texture then
         BGHframe.icon:SetTexture(texture)
         BGHframe.icon:Show()
+        BGHframe.parentPlate.BGHisShown = true
     else
         BGHframe.icon:SetTexture(nil)
         BGHframe.icon:Hide()
+        BGHframe.parentPlate.BGHisShown = false
     end
 end
 
@@ -294,6 +301,7 @@ local function BGHonHide(BGHframe)
     EnemyPlates[name] = nil
     BGHframe.activeName = nil
     BGHframe.icon:Hide()
+    BGHframe.parentPlate.BGHisShown = false
 end
 
 --------- Anchor offsets for supported custom nameplates ---------
@@ -327,6 +335,7 @@ local CustomPlatesOffsets = {
 
 --------- Updates the icon anchor mapping for the detected custom nameplate ---------
 local function UpdateAnchorMapping(nameplate)
+    if CustomPlateCheck then return end
     for _, plate in ipairs(CustomPlatesOffsets) do
         if nameplate[plate[1]] then
             CustomPlateCheck = true
@@ -374,7 +383,7 @@ local function GetPlateElements(nameplate)
 end
 
 --------- Allows external addons to override a BGH icon's size and anchor ---------
-local function ModifyIcon(self, shouldModify, newParent, iconSize, anchorPoint, relativeFrame, relativePoint, xOffset, yOffset)
+local function ModifyIcon(self, shouldModify, iconSize, anchorPoint, relativeFrame, relativePoint, xOffset, yOffset)
     if shouldModify then
         self.icon:ClearAllPoints()
         self.icon:SetPoint(
@@ -385,26 +394,24 @@ local function ModifyIcon(self, shouldModify, newParent, iconSize, anchorPoint, 
             yOffset
         )
         self.icon:SetSize(iconSize, iconSize)
-        self:SetParent(newParent)
     else
         UpdateIconAnchor(self)
         UpdateIconSize(self)
-        self:SetParent(self.parentPlate)
     end
 end
 
 -------- Setup a frame that manages the healer mark parameters  --------
 local function SetupBGHframe(nameplate)
-    if not CustomPlateCheck then
-        UpdateAnchorMapping(nameplate)
-    end
+    UpdateAnchorMapping(nameplate)
     local plate, nameRegion, healthBar = GetPlateElements(nameplate)
+    if plate.BGHframe then return end
     local BGHframe = CreateFrame("Frame", nil, plate)
     AllNamePlates[plate] = BGHframe 
     plate.BGHframe = BGHframe
     BGHframe.parentPlate = plate
     BGHframe.nameRegion = nameRegion
     BGHframe.healthBar = healthBar
+    BGHframe:SetFrameLevel(plate:GetFrameLevel() + 1)
     BGHframe.icon = BGHframe:CreateTexture(nil, "OVERLAY")
     UpdateIconAnchor(BGHframe)
     UpdateIconSize(BGHframe)
@@ -418,42 +425,16 @@ local function SetupBGHframe(nameplate)
     end
 end
 
----- Checks if the frame is a nameplate ----
-local function IsNamePlate(frame)
-    if frame.RealPlate  -- RefinedBlizzPlates
-    or frame.extended   -- TidyPlates
-    or frame.UnitFrame  -- ElvUI
-    or frame.npHooked   -- NotPlater
-    or frame.kui        -- KuiNameplates
-    or frame.aloftData  -- Aloft
-    or frame.done       -- sNamePlates
-    or frame.myPlate    -- PrettyNameplates
-    then
-        return true
-    end
-    local _, r2 = frame:GetRegions()
-    return r2 and r2:GetObjectType() == "Texture" and r2:GetTexture() == "Interface\\Tooltips\\Nameplate-Border"
-end
-
 ------ Detects newly created nameplate frames and sets up BGH frames ------
-local ChildCount, NewChildCount = 0
-CreateFrame("Frame"):SetScript("OnUpdate", function()
-    NewChildCount = WorldFrame:GetNumChildren()
-    if ChildCount ~= NewChildCount then
-        for i = ChildCount + 1, NewChildCount do
-            local child = select(i, WorldFrame:GetChildren())
-            -- 1 frame delay to ensure custom nameplate is available --
-            CreateFrame("Frame"):SetScript("OnUpdate", function(self)
-                self:SetScript("OnUpdate", nil)
-                self:Hide()
-                if IsNamePlate(child) then
-                    SetupBGHframe(child)
-                end
-            end)
-        end
-        ChildCount = NewChildCount
-    end
-end)
+local function OnNameplateCreated(event, frame)
+    CreateFrame("Frame"):SetScript("OnUpdate", function(self)
+        -- 1 frame delay to ensure custom nameplate is available --
+        self:SetScript("OnUpdate", nil)
+        self:Hide()
+        SetupBGHframe(frame)
+    end)
+end
+LibNameplates.RegisterCallback(BGH_Public, "LibNameplates_NameplateCreated", OnNameplateCreated)
 
 --------- Converts RGB color values to a hexadecimal code ---------
 local function RGBtoHEX(r, g, b)
@@ -1559,7 +1540,7 @@ local function AddInterfaceOptions()
         description:SetJustifyV("TOP")
         description:SetShadowColor(0, 0, 0)
         description:SetShadowOffset(1, -1)
-        description:SetFormattedText(L["Marks BG healer nameplates with a configurable icon.\nSupports two detection methods that can work simultaneously.\n\nAuthor: |cffc41f3bKhal|r\nVersion: %s"], version)
+        description:SetFormattedText(L["Marks BG healer nameplates with a configurable icon.\nSupports two detection methods that can work simultaneously.\n\nAuthor: |cffc41f3bKhal|r\nVersion: %s"], GetAddOnMetadata(AddonName, "Version"))
         description:SetNonSpaceWrap(true)
         local settingsButton = CreateFrame("Button", nil, self, "UIPanelButtonTemplate")
         settingsButton:SetSize(100, 30)
@@ -1582,7 +1563,7 @@ function EventHandler:ADDON_LOADED(event, ...)
     local addon = ...
 	if addon == AddonName then
         InitSettings()
-        print(string_format(" |cff00FF98BattleGroundHealers|r v%s by |cffc41f3bKhal|r", version))
+        print(string_format(" |cff00FF98BattleGroundHealers|r v%s by |cffc41f3bKhal|r", GetAddOnMetadata(AddonName, "Version")))
         self:UnregisterEvent(event)
         self[event] = nil
 	end
