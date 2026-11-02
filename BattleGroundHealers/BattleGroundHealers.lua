@@ -291,6 +291,7 @@ local function BGHonShow(BGHframe)
     elseif reaction == 2 then
         FriendlyPlates[name] = BGHframe
     end
+    BGHframe:SetFrameLevel(BGHframe.parentPlate:GetFrameLevel() + 1)
     UpdateIconTexture(BGHframe)
 end
 
@@ -411,7 +412,6 @@ local function SetupBGHframe(nameplate)
     BGHframe.parentPlate = plate
     BGHframe.nameRegion = nameRegion
     BGHframe.healthBar = healthBar
-    BGHframe:SetFrameLevel(plate:GetFrameLevel() + 1)
     BGHframe.icon = BGHframe:CreateTexture(nil, "OVERLAY")
     UpdateIconAnchor(BGHframe)
     UpdateIconSize(BGHframe)
