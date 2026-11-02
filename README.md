@@ -1,11 +1,6 @@
 # BattleGroundHealers
 **BattleGroundHealers** is a World of Warcraft addon for **Wrath of the Lich King (WotLK) 3.3.5a**  
 
-<p align="center">
-  <img src="https://raw.githubusercontent.com/KhalGH/BattleGroundHealers-WotLK/refs/heads/assets/assets/BGHicon200p.png" 
-       alt="ItemLevel UI Preview" width="15%">
-</p>
-
 ## Features  
 - Marks BG healer nameplates with a configurable icon.  
 - Supports two detection methods that can work simultaneously: <br>
@@ -31,11 +26,11 @@
 - **`/bgh hth <#>`** → Modifies healing threshold for BG Scoreboard detection.    
 
 ## Installation  
-1. [Download](https://github.com/KhalGH/BattleGroundHealers-WotLK/releases/download/v1.6.3/BattleGroundHealers-v1.6.3.zip) the addon
+1. [Download](https://github.com/KhalGH/BattleGroundHealers-WotLK/releases/download/v1.6.4/BattleGroundHealers-v1.6.4.zip) the addon
 2. Extract the **BattleGroundHealers** folder into `World of Warcraft/Interface/AddOns/`.  
 3. Restart the game and enable the addon.  
 
 ## Information  
-- **Addon Version:** 1.6.3  
+- **Addon Version:** 1.6.4  
 - **Game Version:** 3.3.5a (WotLK)  
 - **Author:** Khal  
